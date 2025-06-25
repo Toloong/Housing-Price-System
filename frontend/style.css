@@ -1,0 +1,33 @@
+/* --- 调试代码：添加一个显眼的边框来测试CSS加载 --- */
+/* body {
+    border: 5px solid green !important;
+} */
+
+.main-title {
+    font-size: 4.5rem !important; /* 增强优先级 */
+    font-weight: bold !important;
+    text-align: center !important;
+    padding: 1rem 0 !important;
+    margin-bottom: 1rem !important;
+}
+
+/* 使用更稳定的选择器为导航栏设置粘性定位 */
+div[data-testid="stHorizontalBlock"] {
+    position: sticky;
+    top: 0;
+    z-index: 999;
+    background-color: white;
+}
+
+/* 为整个页面容器增加顶部内边距，为粘性导航栏腾出空间 */
+.main .block-container {
+    padding-top: 5rem; /* 此值约等于导航栏高度，可按需调整 */
+}
+
+/*
+选择包含主标题的Markdown容器，并使用负外边距将其拉回顶部，
+这样标题的位置就不会受到上述内边距的影响。
+*/
+div[data-testid="stMarkdownContainer"]:has(p.main-title) {
+    margin-top: -5rem; /* 此值应与上面的padding-top相等 */
+}
