@@ -89,3 +89,17 @@ div[data-testid="stMarkdownContainer"]:has(p.main-title) {
     margin-top: -5rem; /* 此值应与上面的padding-top相等 */
 }
 ```
+
+---
+
+### 2025年6月26日 主要会话与操作总结
+
+- 新增并生成了 requirements.txt 文件，统一管理 Python 项目依赖，内容包括 fastapi、uvicorn、psycopg2-binary、pandas、requests、plotly、streamlit、streamlit-option-menu。
+- 指导了如何使用 pip install -r requirements.txt 一键安装依赖，并解释了 requirements.txt 的作用。
+- 推荐并指导安装 PostgreSQL 图形化管理工具 DBeaver，解决了 apt 源无法安装 pgAdmin4 的问题，说明了 snap 安装 dbeaver-ce 的正常提示。
+- 详细说明了如何用 DBeaver 连接和管理 PostgreSQL 数据库，包括填写主机、端口、用户名、密码等信息。
+- 解答了 PostgreSQL 连接常见报错（如 FATAL: password authentication failed、database does not exist），并给出修复方法（如重置密码、创建数据库等）。
+- 说明了 psycopg2 包的作用及安装方法。
+- 指导了 Maven 依赖报错（sqlite-jdbc:RELEASE cannot be resolved）的原因及解决办法，建议使用具体版本号。
+- 说明了 pom.xml 文件的标准位置和打开方式。
+- 今日所有关键变更已同步总结进 README.md 的更新日志。
