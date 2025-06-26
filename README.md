@@ -80,3 +80,11 @@ streamlit run frontend/app.py
 - `GET /trend`: 获取指定城市和区域的房价走势数据。
 - `GET /compare`: 获取用于城市房价对比的数据。
 - `GET /areas`: 根据城市名称获取其下属的区域列表。
+
+## 更新日志
+
+### 2025-06-26
+- 新增 requirements.txt 文件，统一管理项目依赖。
+  - 依赖包括 fastapi、uvicorn、psycopg2-binary、pandas、requests、plotly、streamlit、streamlit-option-menu。
+- 推荐使用 pip install -r requirements.txt 一键安装所有依赖。
+- 优化了依赖管理，便于环境复现和部署。
