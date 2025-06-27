@@ -1,4 +1,4 @@
-## 房价分析系统前端开发会话记录
+## 房价分析系统开发会话记录
 
 **日期:** 2025年6月25日
 
@@ -103,3 +103,22 @@ div[data-testid="stMarkdownContainer"]:has(p.main-title) {
 - 指导了 Maven 依赖报错（sqlite-jdbc:RELEASE cannot be resolved）的原因及解决办法，建议使用具体版本号。
 - 说明了 pom.xml 文件的标准位置和打开方式。
 - 今日所有关键变更已同步总结进 README.md 的更新日志。
+
+---
+
+### 2025年6月27日 爬虫优化
+
+- **目标**：将原有的基于 `BeautifulSoup` 和 `pandas` 的单文件爬虫脚本 (`scraper.py`) 升级为更健壮、可扩展的 `Scrapy` 项目。
+- **操作流程**：
+    1.  安装 `Scrapy` 库。
+    2.  在 `scraper/` 目录下初始化名为 `housing_spider` 的新 Scrapy 项目。
+    3.  **定义数据结构 (`items.py`)**：创建 `HousingSpiderItem`，包含 `city`, `area`, `price`, `date` 字段。
+    4.  **编写爬虫 (`spiders/housing_spider.py`)**：实现了一个 Spider，用于读取本地的 `mock_data.html` 文件，并使用 Scrapy 的 CSS 选择器解析数据，生成 Item。
+    5.  **创建数据管道 (`pipelines.py`)**：实现了一个 Pipeline，重用了原脚本中基于 `pandas` 的数据处理逻辑，包括：
+        - 读取现有的 `housing_data.csv`。
+        - 合并新抓取的数据。
+        - 按月份对数据进行去重，保留最新记录。
+        - 将处理后的数据写回 `housing_data.csv`。
+    6.  **启用管道 (`settings.py`)**：在项目设置中激活了该 Pipeline。
+    7.  **执行与验证**：通过 `scrapy crawl housing_spider` 命令成功运行了爬虫，并验证了数据已正确更新。
+- **结论**：原 `scraper.py` 脚本的功能已完全被 Scrapy 项目替代，因此该文件现在是冗余的，可以被安全删除。

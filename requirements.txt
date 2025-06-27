@@ -6,3 +6,4 @@ requests
 plotly
 streamlit
 streamlit-option-menu
+scrapy

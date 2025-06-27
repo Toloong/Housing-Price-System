@@ -18,6 +18,7 @@
 - **后端**: Python, FastAPI
 - **前端**: Python, Streamlit, streamlit-option-menu
 - **数据处理**: Pandas
+- **数据爬取**: Scrapy
 
 ## 目录结构
 
@@ -31,7 +32,12 @@
 │   ├── app.py            # Streamlit 应用主文件
 │   └── style.css         # 前端自定义样式
 ├── scraper/
-│   ├── scraper.py        # 数据爬虫
+│   ├── housing_spider/   # Scrapy 爬虫项目
+│   │   ├── spiders/
+│   │   │   └── housing_spider.py # 爬虫实现
+│   │   ├── items.py      # 数据结构定义
+│   │   ├── pipelines.py  # 数据处理管道
+│   │   └── settings.py   # 爬虫配置
 │   └── mock_data.html    # 爬虫使用的HTML模板
 └── README.md
 ```
@@ -54,9 +60,19 @@ source .venv/bin/activate  # Linux/macOS
 pip install -r requirements.txt
 ```
 > **注意**: 如果 `requirements.txt` 文件不存在，请根据需要安装以下核心库：
-> `pip install fastapi uvicorn streamlit pandas requests beautifulsoup4 streamlit-option-menu`
+> `pip install fastapi uvicorn streamlit pandas requests scrapy streamlit-option-menu`
 
-### 3. 启动后端服务
+### 3. 更新数据（可选）
+
+如果需要重新抓取或更新数据，请进入 `scraper` 目录并运行 Scrapy 爬虫：
+
+```bash
+cd scraper
+scrapy crawl housing_spider
+cd ..
+```
+
+### 4. 启动后端服务
 
 在项目根目录下运行：
 ```bash
@@ -64,7 +80,7 @@ uvicorn backend.main:app --reload --port 8000
 ```
 服务将在 `http://127.0.0.1:8000` 上可用。
 
-### 4. 启动前端应用
+### 5. 启动前端应用
 
 打开一个新的终端窗口，在项目根目录下运行：
 ```bash
@@ -82,6 +98,13 @@ streamlit run frontend/app.py
 - `GET /areas`: 根据城市名称获取其下属的区域列表。
 
 ## 更新日志
+
+### 2025-06-27
+- **爬虫重构**: 使用 `Scrapy` 框架完全重构了数据爬虫，替代了原有的 `BeautifulSoup` 脚本。
+  - 新的爬虫项目位于 `scraper/housing_spider/`，结构更清晰、功能更强大。
+  - 实现了与原脚本相同的去重和数据更新逻辑。
+- **项目依赖更新**: 在 `requirements.txt` 中添加了 `scrapy`。
+- **文档同步**: 更新了 `README.md` 中的技术栈、目录结构和运行说明。
 
 ### 2025-06-26
 - 新增 requirements.txt 文件，统一管理项目依赖。
