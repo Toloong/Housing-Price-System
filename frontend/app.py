@@ -177,46 +177,163 @@ if page == "房价查询":
 if page == "趋势分析":
     st.header("分析房价走势")
     cities = load_all_cities()
-    col1, col2 = st.columns(2)
-    with col1:
-        trend_city = st.selectbox("请选择城市", cities, index=1, key="trend_city_select")
-    with col2:
-        areas = load_areas_for_city(trend_city)
-        default_area = "黄浦区" if trend_city == "上海" else ("海淀区" if trend_city == "北京" else "南山区")
-        
-        if areas:
-            try:
-                default_index = areas.index(default_area)
-            except ValueError:
-                default_index = 0
-            trend_area = st.selectbox("请选择区域", areas, index=default_index, key=f"trend_area_select_{trend_city}")
-        else:
-            trend_area = st.text_input("请输入区域", default_area, key=f"trend_area_input_{trend_city}")
-
-    st.button("分析走势") # 保留按钮用于手动刷新
-
-    if trend_city and trend_area:
-        try:
-            res = requests.get(f"{BACKEND_URL}/trend", params={"city": trend_city, "area": trend_area})
-            if res.status_code == 200:
-                trend_data = res.json().get("trend", [])
-                if trend_data:
-                    df_trend = pd.DataFrame(trend_data)
-                    df_trend['date'] = pd.to_datetime(df_trend['date'])
-                    df_trend = df_trend.sort_values('date')
-
-                    st.subheader(f"{trend_city} - {trend_area} 房价走势")
-                    fig = px.line(df_trend, x='date', y='price', title="房价走势分析", markers=True,
-                                  labels={"date": "日期", "price": "价格"})
-                    st.plotly_chart(fig, use_container_width=True)
-                else:
-                    st.warning("未找到该区域的房价趋势数据。")
+    
+    # 添加分析模式选择
+    analysis_mode = st.radio(
+        "选择分析模式",
+        ["单个区域分析", "城市全景分析"],
+        horizontal=True,
+        help="单个区域分析：查看特定区域的详细趋势；城市全景分析：对比该城市所有区域的趋势"
+    )
+    
+    if analysis_mode == "单个区域分析":
+        # 原有的单个区域分析功能
+        col1, col2 = st.columns(2)
+        with col1:
+            trend_city = st.selectbox("请选择城市", cities, index=1, key="trend_city_select")
+        with col2:
+            areas = load_areas_for_city(trend_city)
+            default_area = "黄浦区" if trend_city == "上海" else ("海淀区" if trend_city == "北京" else "南山区")
+            
+            if areas:
+                try:
+                    default_index = areas.index(default_area)
+                except ValueError:
+                    default_index = 0
+                trend_area = st.selectbox("请选择区域", areas, index=default_index, key=f"trend_area_select_{trend_city}")
             else:
-                st.error(f"获取数据失败，状态码: {res.status_code}")
-        except requests.exceptions.ConnectionError:
-            st.error("无法连接到后端服务。")
-    else:
-        st.warning("请输入城市和区域。")
+                trend_area = st.text_input("请输入区域", default_area, key=f"trend_area_input_{trend_city}")
+
+        if trend_city and trend_area:
+            try:
+                res = requests.get(f"{BACKEND_URL}/trend", params={"city": trend_city, "area": trend_area}, timeout=10)
+                if res.status_code == 200:
+                    trend_data = res.json().get("trend", [])
+                    if trend_data:
+                        df_trend = pd.DataFrame(trend_data)
+                        df_trend['date'] = pd.to_datetime(df_trend['date'])
+                        df_trend = df_trend.sort_values('date')
+
+                        st.subheader(f"📈 {trend_city} - {trend_area} 房价走势")
+                        fig = px.line(df_trend, x='date', y='price', title=f"{trend_city} {trend_area} 房价走势分析", 
+                                      markers=True, labels={"date": "日期", "price": "价格 (元/平米)"})
+                        fig.update_layout(height=500)
+                        st.plotly_chart(fig, use_container_width=True)
+                        
+                        # 显示趋势统计信息
+                        col1, col2, col3, col4 = st.columns(4)
+                        with col1:
+                            st.metric("当前价格", f"{trend_data[-1]['price']:,.0f} 元/平米")
+                        with col2:
+                            price_change = trend_data[-1]['price'] - trend_data[0]['price']
+                            st.metric("总变化", f"{price_change:+,.0f} 元/平米", f"{price_change/trend_data[0]['price']*100:+.1f}%")
+                        with col3:
+                            prices = [d['price'] for d in trend_data]
+                            st.metric("最高价格", f"{max(prices):,.0f} 元/平米")
+                        with col4:
+                            st.metric("最低价格", f"{min(prices):,.0f} 元/平米")
+                    else:
+                        st.warning("未找到该区域的房价趋势数据。")
+                else:
+                    st.error(f"获取数据失败，状态码: {res.status_code}")
+            except requests.exceptions.RequestException as e:
+                st.error(f"请求失败: {str(e)}")
+        else:
+            st.warning("请选择城市和区域。")
+    
+    else:  # 城市全景分析
+        trend_city = st.selectbox("请选择城市", cities, index=1, key="city_overview_select")
+        
+        if trend_city:
+            try:
+                # 获取城市所有区域的趋势数据
+                res = requests.get(f"{BACKEND_URL}/city_all_trends", params={"city": trend_city}, timeout=15)
+                if res.status_code == 200:
+                    data = res.json()
+                    areas = data.get("areas", [])
+                    trends = data.get("trends", {})
+                    
+                    if trends:
+                        st.subheader(f"🏙️ {trend_city}市所有区域房价趋势对比")
+                        
+                        # 准备绘图数据
+                        all_data = []
+                        for area, trend_data in trends.items():
+                            for point in trend_data:
+                                all_data.append({
+                                    'date': point['date'],
+                                    'price': point['price'],
+                                    'area': area
+                                })
+                        
+                        if all_data:
+                            df_all = pd.DataFrame(all_data)
+                            df_all['date'] = pd.to_datetime(df_all['date'])
+                            df_all = df_all.sort_values(['area', 'date'])
+                            
+                            # 创建多线趋势图
+                            fig = px.line(df_all, x='date', y='price', color='area',
+                                         title=f"{trend_city}市各区域房价走势对比",
+                                         labels={"date": "日期", "price": "价格 (元/平米)", "area": "区域"},
+                                         markers=True)
+                            fig.update_layout(height=600, legend=dict(orientation="v", yanchor="top", y=1, xanchor="left", x=1.01))
+                            st.plotly_chart(fig, use_container_width=True)
+                            
+                            # 显示各区域统计对比
+                            st.subheader("📊 各区域统计对比")
+                            
+                            # 计算统计数据
+                            stats_data = []
+                            for area in areas:
+                                area_data = df_all[df_all['area'] == area]
+                                if not area_data.empty:
+                                    latest_price = area_data['price'].iloc[-1]
+                                    earliest_price = area_data['price'].iloc[0]
+                                    max_price = area_data['price'].max()
+                                    min_price = area_data['price'].min()
+                                    avg_price = area_data['price'].mean()
+                                    price_change = latest_price - earliest_price
+                                    change_pct = (price_change / earliest_price) * 100
+                                    
+                                    stats_data.append({
+                                        '区域': area,
+                                        '当前价格': f"{latest_price:,.0f}",
+                                        '均价': f"{avg_price:,.0f}",
+                                        '最高价': f"{max_price:,.0f}",
+                                        '最低价': f"{min_price:,.0f}",
+                                        '总变化': f"{price_change:+,.0f}",
+                                        '变化率': f"{change_pct:+.1f}%"
+                                    })
+                            
+                            if stats_data:
+                                stats_df = pd.DataFrame(stats_data)
+                                st.dataframe(stats_df, use_container_width=True)
+                                
+                                # 区域排名
+                                col1, col2 = st.columns(2)
+                                with col1:
+                                    st.subheader("🏆 当前房价排名")
+                                    price_ranking = sorted(stats_data, key=lambda x: float(x['当前价格'].replace(',', '')), reverse=True)
+                                    for i, area_stat in enumerate(price_ranking[:3], 1):
+                                        emoji = "🥇" if i == 1 else "🥈" if i == 2 else "🥉"
+                                        st.write(f"{emoji} {area_stat['区域']}: {area_stat['当前价格']} 元/平米")
+                                
+                                with col2:
+                                    st.subheader("📈 涨幅排名")
+                                    change_ranking = sorted(stats_data, key=lambda x: float(x['变化率'].replace('%', '').replace('+', '')), reverse=True)
+                                    for i, area_stat in enumerate(change_ranking[:3], 1):
+                                        emoji = "🚀" if i == 1 else "📈" if i == 2 else "⬆️"
+                                        st.write(f"{emoji} {area_stat['区域']}: {area_stat['变化率']}")
+                        else:
+                            st.warning("暂无趋势数据可显示。")
+                    else:
+                        st.warning(f"未找到 {trend_city} 的趋势数据。")
+                else:
+                    st.error(f"获取城市趋势数据失败，状态码: {res.status_code}")
+            except requests.exceptions.RequestException as e:
+                st.error(f"请求失败: {str(e)}")
+        else:
+            st.info("请选择要分析的城市。")
 
 # --- 城市对比页面 ---
 if page == "城市对比":

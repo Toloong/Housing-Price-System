@@ -73,6 +73,39 @@ def trend(city: str, area: str):
     trend_data = monthly_avg[['date', 'price']].to_dict(orient='records')
     return {"city": city, "area": area, "trend": trend_data}
 
+@app.get("/city_all_trends")
+def get_city_all_trends(city: str):
+    """获取指定城市所有区域的房价走势数据"""
+    try:
+        city_df = df[df['city'] == city].copy()
+        if city_df.empty:
+            raise HTTPException(status_code=404, detail=f"未找到城市 '{city}' 的数据")
+        
+        # 获取该城市的所有区域
+        areas = sorted(city_df['area'].unique())
+        
+        # 为每个区域计算趋势数据
+        all_trends = {}
+        for area in areas:
+            area_df = city_df[city_df['area'] == area].copy()
+            if not area_df.empty:
+                # 按月分组并计算均价
+                area_df['month'] = area_df['date'].dt.to_period('M')
+                monthly_avg = area_df.groupby('month')['price'].mean().reset_index()
+                monthly_avg['date'] = monthly_avg['month'].dt.strftime('%Y-%m')
+                monthly_avg.sort_values('month', inplace=True)
+                
+                trend_data = monthly_avg[['date', 'price']].to_dict(orient='records')
+                all_trends[area] = trend_data
+        
+        return {
+            "city": city,
+            "areas": areas,
+            "trends": all_trends
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"获取城市趋势数据失败: {str(e)}")
+
 @app.get("/compare")
 def compare(city1: str, city2: str):
     """对比不同城市最近6个月的房价走势"""
