@@ -31,3 +31,53 @@ div[data-testid="stHorizontalBlock"] {
 div[data-testid="stMarkdownContainer"]:has(p.main-title) {
     margin-top: -5rem; /* 此值应与上面的padding-top相等 */
 }
+
+/* AI助手页面样式 */
+.ai-chat-container {
+    background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%) !important;
+    border-radius: 10px !important;
+    padding: 1rem !important;
+    margin: 1rem 0 !important;
+}
+
+.ai-suggestion-button {
+    background: linear-gradient(45deg, #667eea 0%, #764ba2 100%) !important;
+    color: white !important;
+    border: none !important;
+    border-radius: 8px !important;
+    padding: 0.5rem 1rem !important;
+    margin: 0.2rem !important;
+    transition: all 0.3s ease !important;
+}
+
+.ai-suggestion-button:hover {
+    transform: translateY(-2px) !important;
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3) !important;
+}
+
+.ai-metric-card {
+    background: white !important;
+    border-radius: 8px !important;
+    padding: 1rem !important;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1) !important;
+    border-left: 4px solid #667eea !important;
+}
+
+.ai-insight-container {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+    color: white !important;
+    border-radius: 10px !important;
+    padding: 1.5rem !important;
+    margin: 1rem 0 !important;
+}
+
+/* 机器人图标动画 */
+@keyframes robot-pulse {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.1); }
+    100% { transform: scale(1); }
+}
+
+.robot-icon {
+    animation: robot-pulse 2s infinite !important;
+}

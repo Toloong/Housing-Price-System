@@ -7,3 +7,5 @@ plotly
 streamlit
 streamlit-option-menu
 scrapy
+pydantic
+python-dateutil

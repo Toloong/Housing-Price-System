@@ -31,19 +31,18 @@ BACKEND_URL = "http://127.0.0.1:8000"
 # --- 数据加载 --- 
 @st.cache_data # 使用缓存来避免重复加载数据
 def load_all_cities():
-    """从后端加载所有可用的城市列表，这里用固定的列表模拟"""
-    # 在真实的系统中，这里可以是一个API调用
-    # 为了简单起见，我们直接从已知的数据中获取
-    # 注意：这个模拟列表应该与你的 housing_data.csv 保持一致
+    """从后端加载所有可用的城市列表"""
     try:
-        # 尝试从一个（可能不存在的）API端点获取城市列表
-        # response = requests.get("http://127.0.0.1:8000/cities")
-        # response.raise_for_status()
-        # return response.json()["cities"]
-        # 目前，我们硬编码这个列表
-        return ["北京", "上海", "深圳"]
+        # 尝试从后端API获取城市列表
+        response = requests.get(f"{BACKEND_URL}/cities")
+        if response.status_code == 200:
+            return response.json().get("cities", [])
+        else:
+            # API失败时返回默认列表
+            return ["北京", "上海", "深圳", "广州", "杭州", "重庆"]
     except requests.exceptions.RequestException:
-        return ["北京", "上海", "深圳"] # 如果API失败，返回一个默认列表
+        # 如果API失败，返回默认列表
+        return ["北京", "上海", "深圳", "广州", "杭州", "重庆"]
 
 @st.cache_data
 def load_areas_for_city(city):
@@ -58,8 +57,8 @@ def load_areas_for_city(city):
 # --- 页面选择 --- 
 page = option_menu(
     menu_title=None,  # 标题已在页面顶部单独显示
-    options=["主页", "房价查询", "趋势分析", "城市对比", "数据洞察"],
-    icons=['house', 'search', 'graph-up', 'distribute-horizontal', 'clipboard-data'],
+    options=["主页", "房价查询", "趋势分析", "城市对比", "数据洞察", "AI助手"],
+    icons=['house', 'search', 'graph-up', 'distribute-horizontal', 'clipboard-data', 'robot'],
     menu_icon="cast",
     default_index=0,
     orientation="horizontal",
@@ -76,6 +75,7 @@ if page == "主页":
     - **趋势分析**: 查看特定城市特定区域的房价随时间变化的走势。
     - **城市对比**: 直观地比较两个城市最近半年的平均房价趋势。
     - **数据洞察**: 对单个城市的房价数据进行深入的统计分析，发现数据背后的故事。
+    - **AI助手**: 智能分析房价数据，提供投资建议和市场洞察。
 
     请通过上方的导航栏选择您感兴趣的功能。
     """)
@@ -271,3 +271,167 @@ if page == "数据洞察":
             st.error(f"请求后端服务失败，请确保后端正在运行。错误信息: {e}")
         except Exception as e:
             st.error(f"处理数据时发生未知错误: {e}")
+
+# --- AI助手页面 ---
+if page == "AI助手":
+    st.header("🤖 AI房价分析助手")
+    st.markdown("我是您的智能房价分析助手，可以帮您分析市场趋势、提供投资建议。")
+    
+    # 城市选择
+    cities = load_all_cities()
+    col1, col2 = st.columns([1, 1])
+    
+    with col1:
+        selected_city = st.selectbox("选择城市 (可选)", [""] + cities, index=0)
+    
+    with col2:
+        if selected_city:
+            areas = load_areas_for_city(selected_city)
+            selected_area = st.selectbox("选择区域 (可选)", [""] + areas, index=0)
+        else:
+            selected_area = ""
+    
+    # 获取建议问题
+    if selected_city:
+        try:
+            suggestions_response = requests.get(f"{BACKEND_URL}/ai/suggestions", params={"city": selected_city})
+            if suggestions_response.status_code == 200:
+                suggestions = suggestions_response.json().get("suggestions", [])
+                
+                st.subheader("💡 建议问题")
+                col1, col2, col3 = st.columns(3)
+                
+                for i, suggestion in enumerate(suggestions[:6]):  # 最多显示6个建议
+                    col = [col1, col2, col3][i % 3]
+                    with col:
+                        if st.button(suggestion, key=f"suggestion_{i}"):
+                            st.session_state.ai_query = suggestion
+        except:
+            pass
+    
+    # 用户输入
+    st.subheader("💬 向AI提问")
+    
+    # 使用session state保存查询
+    if "ai_query" not in st.session_state:
+        st.session_state.ai_query = ""
+    
+    # 文本输入框
+    user_query = st.text_input(
+        "请输入您的问题", 
+        value=st.session_state.ai_query,
+        placeholder="例如：北京的房价趋势如何？深圳适合投资吗？",
+        key="query_input"
+    )
+    
+    # 清空session state中的查询
+    if user_query != st.session_state.ai_query:
+        st.session_state.ai_query = ""
+    
+    # 分析按钮
+    col1, col2, col3 = st.columns([1, 1, 2])
+    with col1:
+        analyze_button = st.button("🔍 开始分析", type="primary")
+    
+    with col2:
+        clear_button = st.button("🗑️ 清空")
+        if clear_button:
+            st.session_state.ai_query = ""
+            st.rerun()
+    
+    # AI分析
+    if analyze_button and user_query.strip():
+        with st.spinner("AI正在分析中..."):
+            try:
+                # 准备请求数据
+                request_data = {
+                    "query": user_query,
+                    "city": selected_city if selected_city else None,
+                    "area": selected_area if selected_area else None
+                }
+                
+                # 发送请求
+                response = requests.post(f"{BACKEND_URL}/ai/analyze", json=request_data)
+                
+                if response.status_code == 200:
+                    ai_result = response.json()
+                    
+                    # 显示分析结果
+                    st.success("✅ 分析完成")
+                    
+                    # 分析标题
+                    st.subheader(f"📊 {ai_result.get('analysis', '分析结果')}")
+                    
+                    # 显示洞察
+                    insights = ai_result.get('insights', {})
+                    if insights and isinstance(insights, dict):
+                        st.subheader("📈 数据洞察")
+                        
+                        if 'trend_direction' in insights:
+                            # 趋势分析结果
+                            col1, col2, col3 = st.columns(3)
+                            
+                            with col1:
+                                trend_emoji = "📈" if insights['trend_direction'] == "上涨" else "📉" if insights['trend_direction'] == "下跌" else "📊"
+                                st.metric("趋势方向", f"{trend_emoji} {insights['trend_direction']}")
+                                
+                            with col2:
+                                st.metric("价格变化", f"{insights.get('price_change', 0):.2f} 元/平米")
+                                
+                            with col3:
+                                change_pct = insights.get('price_change_percentage', 0)
+                                st.metric("变化幅度", f"{change_pct:+.2f}%")
+                            
+                            col1, col2, col3 = st.columns(3)
+                            with col1:
+                                st.metric("当前价格", f"{insights.get('current_price', 0):,.2f} 元/平米")
+                            with col2:
+                                st.metric("平均价格", f"{insights.get('average_price', 0):,.2f} 元/平米")
+                            with col3:
+                                st.metric("价格波动", f"{insights.get('volatility', 0):,.2f}")
+                        
+                        else:
+                            # 市场洞察结果
+                            col1, col2 = st.columns(2)
+                            
+                            with col1:
+                                for key, value in list(insights.items())[:3]:
+                                    st.metric(key, str(value))
+                            
+                            with col2:
+                                for key, value in list(insights.items())[3:]:
+                                    st.metric(key, str(value))
+                    
+                    # 显示建议
+                    recommendations = ai_result.get('recommendations', [])
+                    if recommendations:
+                        st.subheader("💡 AI建议")
+                        for i, rec in enumerate(recommendations):
+                            st.info(f"{i+1}. {rec}")
+                
+                else:
+                    st.error(f"分析失败: {response.text}")
+                    
+            except requests.exceptions.RequestException as e:
+                st.error(f"无法连接到AI服务: {e}")
+            except Exception as e:
+                st.error(f"分析过程中发生错误: {e}")
+    
+    elif analyze_button:
+        st.warning("请输入您的问题")
+    
+    # 使用说明
+    with st.expander("📚 使用说明"):
+        st.markdown("""
+        **AI助手可以帮您：**
+        - 🔍 **趋势分析**: 分析房价走势和变化趋势
+        - 💰 **投资建议**: 基于数据提供投资参考意见  
+        - 📊 **市场洞察**: 深入分析市场数据和特征
+        - 🏙️ **城市对比**: 提供不同城市的对比分析建议
+        
+        **使用技巧：**
+        - 选择具体城市获得更精准的分析
+        - 可以询问具体区域的详细信息
+        - 支持自然语言提问，如"北京房价如何？"
+        - 点击建议问题快速开始分析
+        """)
