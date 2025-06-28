@@ -1,3 +1,24 @@
+/* CSS缓存控制和页面稳定性增强 */
+* {
+    box-sizing: border-box !important;
+}
+
+/* 防止页面加载时的闪烁和布局跳动 */
+.main .block-container {
+    min-height: 100vh !important;
+    position: relative !important;
+}
+
+/* 确保Streamlit组件正确渲染 */
+.stSelectbox, .stButton, .stTextInput {
+    width: 100% !important;
+}
+
+/* 防止组件重叠 */
+.element-container {
+    margin-bottom: 1rem !important;
+}
+
 /* --- 调试代码：添加一个显眼的边框来测试CSS加载 --- */
 /* body {
     border: 5px solid green !important;

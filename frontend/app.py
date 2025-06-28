@@ -13,13 +13,29 @@ def load_css(file_name):
     script_dir = os.path.dirname(os.path.abspath(__file__))
     file_path = os.path.join(script_dir, file_name)
     try:
+        # 获取文件修改时间作为版本号，实现缓存破坏
+        import time
+        file_mtime = os.path.getmtime(file_path)
+        version = str(int(file_mtime))
+        
         with open(file_path, encoding='utf-8') as f:
-            st.markdown(f'<style>{f.read()}</style>', unsafe_allow_html=True)
+            css_content = f.read()
+            # 添加版本注释来确保CSS更新
+            css_with_version = f"/* CSS Version: {version} */\n{css_content}"
+            st.markdown(f'<style>{css_with_version}</style>', unsafe_allow_html=True)
     except FileNotFoundError:
         st.error(f"CSS文件未找到: {file_path}")
+    except Exception as e:
+        st.error(f"加载CSS文件失败: {str(e)}")
 
 # 调用函数加载CSS
 load_css("style.css")
+
+# 添加页面刷新按钮到侧边栏（用于开发调试）
+with st.sidebar:
+    if st.button("🔄 刷新页面缓存", help="如果页面显示异常，点击此按钮清除缓存"):
+        st.cache_data.clear()
+        st.rerun()
 
 # --- 页面主标题 ---
 st.markdown("<p class='main-title'>房价分析系统</p>", unsafe_allow_html=True)
@@ -29,12 +45,12 @@ st.markdown("<p class='main-title'>房价分析系统</p>", unsafe_allow_html=Tr
 BACKEND_URL = "http://127.0.0.1:8000"
 
 # --- 数据加载 --- 
-@st.cache_data # 使用缓存来避免重复加载数据
+@st.cache_data(ttl=300)  # 5分钟缓存，避免缓存过久导致的问题
 def load_all_cities():
     """从后端加载所有可用的城市列表"""
     try:
         # 尝试从后端API获取城市列表
-        response = requests.get(f"{BACKEND_URL}/cities")
+        response = requests.get(f"{BACKEND_URL}/cities", timeout=5)
         if response.status_code == 200:
             return response.json().get("cities", [])
         else:
@@ -44,15 +60,28 @@ def load_all_cities():
         # 如果API失败，返回默认列表
         return ["北京", "上海", "深圳", "广州", "杭州", "重庆"]
 
-@st.cache_data
+@st.cache_data(ttl=300)  # 5分钟缓存
 def load_areas_for_city(city):
     """为指定城市加载区域列表"""
     try:
-        res = requests.get(f"{BACKEND_URL}/areas", params={"city": city})
+        res = requests.get(f"{BACKEND_URL}/areas", params={"city": city}, timeout=5)
         if res.status_code == 200:
             return res.json().get("areas", [])
     except requests.exceptions.RequestException:
-        return [] # 如果API失败，返回空列表
+        return []  # 如果API失败，返回空列表
+
+# --- 页面状态管理 ---
+def initialize_page_state():
+    """初始化页面状态，防止状态混乱"""
+    if 'page_initialized' not in st.session_state:
+        st.session_state.page_initialized = True
+        # 清除可能的旧状态
+        for key in list(st.session_state.keys()):
+            if key.startswith('temp_'):
+                del st.session_state[key]
+
+# 初始化页面状态
+initialize_page_state()
 
 # --- 页面选择 --- 
 page = option_menu(
@@ -80,14 +109,38 @@ if page == "主页":
     请通过上方的导航栏选择您感兴趣的功能。
     """)
 
-    try:
-        response = requests.get(f"{BACKEND_URL}/")
-        if response.status_code == 200:
-            st.success(f"后端服务连接成功: {response.json().get('message')}")
-        else:
-            st.error("后端服务连接失败，请确保后端服务已启动。")
-    except requests.exceptions.ConnectionError:
-        st.error("无法连接到后端服务，请检查后端地址和网络连接。")
+    # 系统状态检查
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.subheader("🔍 系统状态")
+        try:
+            response = requests.get(f"{BACKEND_URL}/", timeout=5)
+            if response.status_code == 200:
+                st.success(f"✅ 后端服务正常: {response.json().get('message')}")
+                
+                # 检查数据完整性
+                cities = load_all_cities()
+                st.info(f"📊 已加载 {len(cities)} 个城市数据")
+                
+            else:
+                st.error("❌ 后端服务异常，请检查服务状态")
+        except requests.exceptions.RequestException as e:
+            st.error(f"❌ 无法连接后端服务: {str(e)}")
+    
+    with col2:
+        st.subheader("🛠️ 故障排除")
+        st.markdown("""
+        **如果遇到页面显示问题：**
+        1. 点击左侧 "🔄 刷新页面缓存" 按钮
+        2. 使用 Ctrl+Shift+R 强制刷新浏览器
+        3. 清除浏览器缓存后重新打开页面
+        """)
+        
+        if st.button("🧹 清除所有缓存", help="清除应用程序缓存，解决数据显示问题"):
+            st.cache_data.clear()
+            st.success("✅ 缓存已清除，页面将自动刷新")
+            st.rerun()
 
 # --- 房价查询页面 ---
 if page == "房价查询":
