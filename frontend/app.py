@@ -13,7 +13,7 @@ def load_css(file_name):
     script_dir = os.path.dirname(os.path.abspath(__file__))
     file_path = os.path.join(script_dir, file_name)
     try:
-        with open(file_path) as f:
+        with open(file_path, encoding='utf-8') as f:
             st.markdown(f'<style>{f.read()}</style>', unsafe_allow_html=True)
     except FileNotFoundError:
         st.error(f"CSS文件未找到: {file_path}")

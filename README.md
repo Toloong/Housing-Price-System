@@ -42,51 +42,117 @@
 └── README.md
 ```
 
-## 运行方式
+## 运行方式 (Windows 用户指南)
+
+本指南将引导您在 Windows 系统上通过 PowerShell 终端运行此项目。
 
 ### 1. 环境准备
 
-确保已安装 Python。然后，在项目根目录下创建并激活虚拟环境：
+在项目根目录打开 PowerShell 终端，然后执行以下步骤：
 
-```bash
-python -m venv .venv
-source .venv/bin/activate  # Linux/macOS
-# .\.venv\Scripts\activate  # Windows
-```
+1.  **创建虚拟环境**:
+    ```powershell
+    python -m venv .venv
+    ```
+
+2.  **激活虚拟环境**:
+    ```powershell
+    .\.venv\Scripts\activate
+    ```
+    > **PowerShell 错误处理**: 如果激活失败并提示“禁止运行脚本”，请先运行以下命令，然后重试激活。此命令仅为当前终端会话更改执行策略，是安全的操作。
+    > ```powershell
+    > Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope Process
+    > ```
+    成功激活后，您的终端提示符前应显示 `(.venv)`。
 
 ### 2. 安装依赖
 
+确保您的虚拟环境已经激活，然后运行：
+```powershell
+pip install -r requirements.txt
+```
+
+### 3. 启动应用 (需要两个终端)
+
+本项目的前后端需要分别启动。请打开 **两个** PowerShell 终端，并在 **每个终端中都激活虚拟环境** (`.\.venv\Scripts\activate`)。
+
+-   **终端 1: 启动后端服务**
+    ```powershell
+    uvicorn backend.main:app --reload --port 8000
+    ```
+    *服务将在 `http://127.0.0.1:8000` 上可用。让此终端保持运行。*
+
+-   **终端 2: 启动前端应用**
+    ```powershell
+    streamlit run frontend/app.py
+    ```
+    *应用将在浏览器中自动打开。*
+
+### 4. 更新数据 (可选)
+
+如果需要重新抓取或更新数据，请打开一个新的、已激活虚拟环境的终端，然后运行：
+```powershell
+cd scraper
+scrapy crawl housing_spider
+cd ..
+```
+
+### 5. 停止应用
+
+当您想停止应用时，请在两个运行服务的终端中分别按下 `Ctrl+C`，或直接点击终端窗口旁的“垃圾桶”图标关闭它们。
+
+## 运行方式 (Linux & macOS 用户指南)
+
+本指南将引导您在 Linux 或 macOS 系统上通过终端运行此项目。
+
+### 1. 环境准备
+
+在项目根目录打开终端，然后执行以下步骤：
+
+1.  **创建虚拟环境**:
+    ```bash
+    python3 -m venv .venv
+    ```
+
+2.  **激活虚拟环境**:
+    ```bash
+    source .venv/bin/activate
+    ```
+    *成功激活后，您的终端提示符前应显示 `(.venv)`。*
+
+### 2. 安装依赖
+
+确保您的虚拟环境已经激活，然后运行：
 ```bash
 pip install -r requirements.txt
 ```
-> **注意**: 如果 `requirements.txt` 文件不存在，请根据需要安装以下核心库：
-> `pip install fastapi uvicorn streamlit pandas requests scrapy streamlit-option-menu`
 
-### 3. 更新数据（可选）
+### 3. 启动应用 (需要两个终端)
 
-如果需要重新抓取或更新数据，请进入 `scraper` 目录并运行 Scrapy 爬虫：
+请打开 **两个** 终端窗口，并在 **每个窗口中都激活虚拟环境** (`source .venv/bin/activate`)。
 
+-   **终端 1: 启动后端服务**
+    ```bash
+    uvicorn backend.main:app --reload --port 8000
+    ```
+
+-   **终端 2: 启动前端应用**
+    ```bash
+    streamlit run frontend/app.py
+    ```
+
+### 4. 更新数据 (可选)
+
+如果需要重新抓取或更新数据，请打开一个新的、已激活虚拟环境的终端，然后运行：
 ```bash
 cd scraper
 scrapy crawl housing_spider
 cd ..
 ```
 
-### 4. 启动后端服务
+### 5. 停止应用
 
-在项目根目录下运行：
-```bash
-uvicorn backend.main:app --reload --port 8000
-```
-服务将在 `http://127.0.0.1:8000` 上可用。
-
-### 5. 启动前端应用
-
-打开一个新的终端窗口，在项目根目录下运行：
-```bash
-streamlit run frontend/app.py
-```
-应用将在浏览器中自动打开。
+在每个运行服务的终端中按下 `Ctrl+C` 即可停止应用。
 
 ## API 接口
 
