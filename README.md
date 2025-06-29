@@ -2,6 +2,20 @@
 
 基于 FastAPI + Streamlit + SQLite 的房价数据分析系统，支持用户管理和数据可视化。
 
+## 🎉 v2.0 重大更新
+
+### ✨ 新增功能
+- **🔐 独立登录页面系统**: 专业三标签页设计（登录/注册/游客模式）
+- **👤 游客模式**: 一键体验系统核心功能，无需注册
+- **🛡️ 管理员权限系统**: 基于用户姓名的权限控制，四层安全验证
+- **🎨 用户体验优化**: 智能导航、权限状态显示、友好错误提示
+
+### 🔒 安全特性
+- 前后端双重权限验证
+- 游客模式严格权限隔离  
+- 多重安全检查机制
+- JWT令牌认证保护
+
 ## 🚀 快速开始
 
 ### 环境安装（首次使用）
@@ -53,14 +67,19 @@ Housing_Price/
 └── README.md             # 项目说明
 ```
 
-## 🔐 测试账户
+## 🔐 测试账户 & 访问方式
 
-| 用户名 | 密码 | 邮箱 | 权限类型 |
-|--------|------|------|----------|
-| admin | 123456 | admin@example.com | 管理员 |
-| testuser | password123 | test@example.com | 普通用户 |
-| testuser2 | password123 | test2@example.com | 普通用户 |
-| 游客模式 | 无需密码 | - | 受限访问 |
+| 用户类型 | 用户名/访问方式 | 密码 | 邮箱 | 权限级别 |
+|---------|----------------|------|------|----------|
+| **管理员** | admin | 123456 | admin@example.com | 完整系统权限 |
+| **普通用户** | testuser | password123 | test@example.com | 基础数据分析权限 |
+| **普通用户** | testuser2 | password123 | test2@example.com | 基础数据分析权限 |
+| **游客模式** | 一键进入 | 无需密码 | - | 核心功能体验权限 |
+
+### 功能体验路径
+1. **新用户**: 选择"游客模式" → 体验系统功能
+2. **注册用户**: 选择"注册" → 创建账户 → 完整功能  
+3. **管理员**: 选择"登录" → admin/123456 → 管理权限
 
 ## 🔐 用户权限管理
 - **管理员权限**: 姓名为"管理员"的用户享有完整系统权限
@@ -71,6 +90,23 @@ Housing_Price/
 - **独立登录界面**: 专业的三标签页设计（登录/注册/游客）
 - **一键游客模式**: 无需注册即可体验系统功能
 - **安全权限控制**: 四层安全验证，确保系统安全性
+
+## 📊 功能覆盖
+
+### ✅ 所有用户可访问
+- 🏠 房价查询和可视化
+- 📈 趋势分析和城市对比  
+- 🤖 AI智能分析助手
+- 📊 数据洞察和统计
+
+### 🔐 仅登录用户可访问
+- 💾 个人偏好保存
+- 📱 完整用户体验
+
+### 👑 仅管理员可访问
+- 👥 用户管理功能
+- 📋 用户列表查看
+- 📊 系统统计信息
 
 ## ⚡ 功能特性
 
@@ -98,6 +134,41 @@ Housing_Price/
 - **前端**: Streamlit, Pandas, Plotly
 - **数据**: CSV数据源，支持爬虫扩展
 - **认证**: JWT令牌认证
+
+## 🌍 English Quick Start
+
+### System Requirements
+- Windows 10/11 or Linux/macOS
+- Python 3.8 or higher
+- Git (optional, for cloning repository)
+
+### Installation & Setup
+```bash
+# Option 1: Automated Setup (Recommended)
+git clone https://github.com/Toloong/Housing-Price-System.git
+cd Housing-Price-System
+setup.bat
+
+# Option 2: Manual Setup
+python -m venv .venv
+.venv\Scripts\activate.bat  # Windows
+# source .venv/bin/activate  # Linux/macOS
+pip install -r requirements.txt
+python -c "from backend.database import init_sqlite_database; init_sqlite_database()"
+```
+
+### Troubleshooting
+```bash
+# Port conflicts
+netstat -ano | findstr :8000
+taskkill /f /pid <process_id>
+
+# Reset environment
+rmdir /s .venv  # Windows
+# rm -rf .venv   # Linux/macOS
+python -m venv .venv
+pip install -r requirements.txt
+```
 
 ## 📦 安装依赖
 
@@ -247,23 +318,39 @@ MIT License
 | 数据完整性 | ⭐⭐⭐⭐ 良好 | ⭐⭐⭐⭐⭐ 企业级 |
 
 ### 已验证功能
-- ✅ 独立登录页面系统
-- ✅ 游客模式一键体验
+- ✅ 独立登录页面系统 (v2.0)
+- ✅ 游客模式一键体验 (v2.0)
+- ✅ 管理员权限控制 (v2.0)
+- ✅ 四层安全权限验证 (v2.0)
 - ✅ 用户注册/登录系统
-- ✅ 管理员权限控制
 - ✅ JWT令牌认证机制
 - ✅ 房价数据查询分析
 - ✅ AI智能分析助手
 - ✅ 数据可视化图表
 - ✅ 多城市对比功能
-- ✅ 四层安全权限验证
 
 ### 项目优势
-- **即开即用**: 无需复杂的数据库配置
+- **即开即用**: 无需复杂的数据库配置，一键启动脚本
 - **跨平台**: 支持Windows/Linux/macOS
-- **轻量级**: 资源占用极低
-- **稳定可靠**: 经过全面测试验证
+- **轻量级**: 资源占用极低，SQLite数据库
+- **安全可靠**: 多层权限验证，经过全面测试
 - **易于部署**: 单文件数据库，便于迁移
+- **用户友好**: 游客模式 + 专业登录界面
+
+## 📝 版本历史
+
+### v2.0.0 (2025-06-29)
+- ✨ 新增独立登录页面系统
+- 👤 新增游客模式功能  
+- 🔐 新增管理员权限控制
+- 🛡️ 增强安全验证机制
+- 🎨 优化用户界面和体验
+- 🔧 修复字符编码问题
+
+### v1.0.0
+- 🏠 基础房价分析功能
+- 📊 数据可视化和AI助手
+- 👥 用户注册登录系统
 
 ## 🤝 贡献指南
 
