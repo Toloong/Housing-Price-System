@@ -20,6 +20,10 @@ def init_session_state():
         st.session_state.user_info = None
     if 'auth_token' not in st.session_state:
         st.session_state.auth_token = None
+    if 'user_mode' not in st.session_state:
+        st.session_state.user_mode = None  # 'logged_in', 'guest', None
+    if 'show_main_app' not in st.session_state:
+        st.session_state.show_main_app = False
 
 def login_user(username, password):
     """用户登录"""
@@ -32,9 +36,20 @@ def login_user(username, password):
         if response.status_code == 200:
             data = response.json()
             if data["success"]:
-                st.session_state.logged_in = True
-                st.session_state.user_info = data["user"]
-                st.session_state.auth_token = data["token"]
+                # 获取完整的用户信息（包括管理员标识）
+                try:
+                    me_response = requests.get(f"{BACKEND_URL}/auth/me", headers={"Authorization": f"Bearer {data['token']}"})
+                    if me_response.status_code == 200:
+                        me_data = me_response.json()
+                        if me_data.get("success"):
+                            user_login_success(me_data["user"], data["token"])
+                        else:
+                            user_login_success(data["user"], data["token"])
+                    else:
+                        user_login_success(data["user"], data["token"])
+                except:
+                    user_login_success(data["user"], data["token"])
+                
                 return True, "登录成功！"
             else:
                 return False, data.get("message", "登录失败")
@@ -68,6 +83,24 @@ def logout_user():
     st.session_state.logged_in = False
     st.session_state.user_info = None
     st.session_state.auth_token = None
+    st.session_state.user_mode = None
+    st.session_state.show_main_app = False
+
+def guest_login():
+    """游客登录"""
+    st.session_state.logged_in = False
+    st.session_state.user_info = None
+    st.session_state.auth_token = None
+    st.session_state.user_mode = "guest"
+    st.session_state.show_main_app = True
+
+def user_login_success(user_data, token):
+    """用户登录成功处理"""
+    st.session_state.logged_in = True
+    st.session_state.user_info = user_data
+    st.session_state.auth_token = token
+    st.session_state.user_mode = "logged_in"
+    st.session_state.show_main_app = True
 
 def get_auth_headers():
     """获取认证请求头"""
@@ -81,11 +114,14 @@ def check_login_status():
         try:
             response = requests.get(f"{BACKEND_URL}/auth/me", headers=get_auth_headers())
             if response.status_code == 200:
-                return True
-            else:
-                # Token无效，清除登录状态
-                logout_user()
-                return False
+                data = response.json()
+                if data.get("success"):
+                    # 更新用户信息，包括管理员标识
+                    st.session_state.user_info = data["user"]
+                    return True
+            # Token无效，清除登录状态
+            logout_user()
+            return False
         except:
             return False
     return False
@@ -168,19 +204,145 @@ def initialize_page_state():
             if key.startswith('temp_'):
                 del st.session_state[key]
 
+# --- 检查用户是否为管理员的函数 ---
+def is_current_user_admin():
+    """检查当前用户是否为管理员"""
+    if st.session_state.user_info:
+        return st.session_state.user_info.get("is_admin", False)
+    return False
+
 # 初始化页面状态
 initialize_page_state()
 
+# --- 登录页面组件 ---
+def show_login_page():
+    """显示登录页面"""
+    st.markdown("""
+    <div style="text-align: center; margin-bottom: 2rem;">
+        <h1>🏠 房价分析系统</h1>
+        <p style="font-size: 1.2rem; color: #666;">专业的房价数据分析平台</p>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    # 创建三列布局
+    col1, col2, col3 = st.columns([1, 2, 1])
+    
+    with col2:
+        # 选择登录方式
+        login_tab, register_tab, guest_tab = st.tabs(["🔑 登录", "📝 注册", "👤 游客模式"])
+        
+        with login_tab:
+            show_login_form()
+            
+        with register_tab:
+            show_register_form()
+            
+        with guest_tab:
+            show_guest_login()
+
+def show_login_form():
+    """显示登录表单"""
+    st.markdown("### 用户登录")
+    
+    with st.form("login_form"):
+        username = st.text_input("用户名或邮箱", placeholder="请输入用户名或邮箱")
+        password = st.text_input("密码", type="password", placeholder="请输入密码")
+        
+        login_button = st.form_submit_button("🔑 登录", use_container_width=True)
+        
+        if login_button:
+            if username and password:
+                with st.spinner("正在登录..."):
+                    success, message = login_user(username, password)
+                    if success:
+                        st.success("登录成功！正在跳转...")
+                        st.rerun()
+                    else:
+                        st.error(f"登录失败：{message}")
+            else:
+                st.warning("请填写完整的登录信息")
+    
+    st.markdown("---")
+    st.info("💡 测试账户：admin / 123456")
+
+def show_register_form():
+    """显示注册表单"""
+    st.markdown("### 用户注册")
+    
+    with st.form("register_form"):
+        username = st.text_input("用户名", placeholder="3-20位字母、数字、下划线")
+        email = st.text_input("邮箱", placeholder="请输入有效邮箱地址")
+        full_name = st.text_input("姓名", placeholder="请输入真实姓名（可选）")
+        password = st.text_input("密码", type="password", placeholder="至少6位字符")
+        confirm_password = st.text_input("确认密码", type="password", placeholder="请再次输入密码")
+        
+        register_button = st.form_submit_button("📝 注册", use_container_width=True)
+        
+        if register_button:
+            if username and email and password and confirm_password:
+                if password != confirm_password:
+                    st.error("两次输入的密码不一致")
+                else:
+                    with st.spinner("正在注册..."):
+                        success, message = register_user(username, email, password, full_name)
+                        if success:
+                            st.success(f"注册成功！{message}")
+                            st.info("请切换到登录标签页进行登录")
+                        else:
+                            st.error(f"注册失败：{message}")
+            else:
+                st.warning("请填写完整的注册信息")
+
+def show_guest_login():
+    """显示游客登录"""
+    st.markdown("### 游客模式")
+    st.markdown("""
+    作为游客，您可以：
+    - ✅ 查看房价数据
+    - ✅ 分析房价趋势  
+    - ✅ 对比不同城市
+    - ✅ 使用AI助手
+    - ❌ 无法使用用户管理功能
+    - ❌ 无法保存个人偏好
+    """)
+    
+    if st.button("👤 以游客身份进入", use_container_width=True, type="primary"):
+        guest_login()
+        st.success("欢迎使用游客模式！")
+        st.rerun()
+    
+    st.markdown("---")
+    st.info("💡 游客模式下可以体验大部分功能，如需完整功能请注册登录")
+
+# 初始化页面状态
+initialize_page_state()
+
+# === 主应用流程控制 ===
+if not st.session_state.show_main_app:
+    # 显示登录页面
+    show_login_page()
+    st.stop()
+
 # --- 页面选择 --- 
-# 检查登录状态
-if st.session_state.logged_in:
+# 检查用户模式
+if st.session_state.user_mode == "logged_in":
     # 已登录用户的导航栏
     col1, col2 = st.columns([4, 1])
     with col1:
+        # 根据用户权限决定导航选项
+        if is_current_user_admin():
+            # 管理员可以看到用户管理
+            nav_options = ["主页", "房价查询", "趋势分析", "城市对比", "数据洞察", "AI助手", "用户管理"]
+            nav_icons = ['house', 'search', 'graph-up', 'distribute-horizontal', 'clipboard-data', 'robot', 'people']
+        else:
+            # 普通用户看不到用户管理
+            nav_options = ["主页", "房价查询", "趋势分析", "城市对比", "数据洞察", "AI助手"]
+            nav_icons = ['house', 'search', 'graph-up', 'distribute-horizontal', 'clipboard-data', 'robot']
+        
         page = option_menu(
             menu_title=None,
-            options=["主页", "房价查询", "趋势分析", "城市对比", "数据洞察", "AI助手", "用户管理"],
-            icons=['house', 'search', 'graph-up', 'distribute-horizontal', 'clipboard-data', 'robot', 'people'],
+            options=nav_options,
+            icons=nav_icons,
             menu_icon="cast",
             default_index=0,
             orientation="horizontal",
@@ -192,28 +354,36 @@ if st.session_state.logged_in:
         if st.button("登出", type="secondary"):
             logout_user()
             st.rerun()
-else:
-    # 未登录用户的导航栏
+
+elif st.session_state.user_mode == "guest":
+    # 游客模式的导航栏 - 绝对不包含用户管理功能
     col1, col2 = st.columns([4, 1])
     with col1:
+        # 游客只能看到基础功能，严格禁止用户管理
+        nav_options = ["主页", "房价查询", "趋势分析", "城市对比", "数据洞察", "AI助手"]
+        nav_icons = ['house', 'search', 'graph-up', 'distribute-horizontal', 'clipboard-data', 'robot']
+        
         page = option_menu(
             menu_title=None,
-            options=["主页", "房价查询", "趋势分析", "城市对比", "数据洞察", "AI助手"],
-            icons=['house', 'search', 'graph-up', 'distribute-horizontal', 'clipboard-data', 'robot'],
+            options=nav_options,
+            icons=nav_icons,
             menu_icon="cast",
             default_index=0,
             orientation="horizontal",
         )
     with col2:
-        # 登录/注册按钮
-        auth_option = st.selectbox("用户操作", ["登录", "注册"], label_visibility="collapsed")
-        if st.button("🔑 " + auth_option):
-            # 只有当点击按钮时才切换到登录/注册页面
-            st.session_state.show_auth = True
-            st.session_state.auth_mode = auth_option.lower()
+        st.write("👤 游客模式")
+        if st.button("登录", type="primary"):
+            logout_user()  # 清除游客状态
             st.rerun()
 
-# 处理登录/注册界面
+else:
+    # 未知状态，返回登录页面
+    st.session_state.show_main_app = False
+    st.rerun()
+
+# --- 页面内容展示 ---
+initialize_page_state()
 if hasattr(st.session_state, 'show_auth') and st.session_state.show_auth:
     if st.session_state.auth_mode == "登录":
         page = "登录"
@@ -222,6 +392,15 @@ if hasattr(st.session_state, 'show_auth') and st.session_state.show_auth:
 
 # --- 主页 ---
 if page == "主页":
+    # 显示当前用户状态
+    if st.session_state.user_mode == "logged_in":
+        user_name = st.session_state.user_info.get('username', '用户') if st.session_state.user_info else '用户'
+        is_admin = is_current_user_admin()
+        admin_status = "管理员" if is_admin else "普通用户"
+        st.success(f"👤 当前登录用户：{user_name} ({admin_status})")
+    elif st.session_state.user_mode == "guest":
+        st.info("👤 当前为游客模式 - 功能受限")
+    
     st.title("欢迎 🏠")
     st.markdown("""
     这是一个交互式Web应用，旨在帮助您分析和可视化不同城市的房价数据。
@@ -235,6 +414,29 @@ if page == "主页":
 
     请通过上方的导航栏选择您感兴趣的功能。
     """)
+    
+    # 权限说明
+    if st.session_state.user_mode == "guest":
+        st.warning("""
+        **游客模式限制：**
+        - ❌ 无法访问用户管理功能
+        - ❌ 无法保存个人偏好设置
+        - ✅ 可以使用所有数据分析功能
+        """)
+    elif st.session_state.user_mode == "logged_in" and not is_current_user_admin():
+        st.info("""
+        **普通用户权限：**
+        - ❌ 无法访问用户管理功能
+        - ✅ 可以保存个人偏好
+        - ✅ 可以使用所有数据分析功能
+        """)
+    elif st.session_state.user_mode == "logged_in" and is_current_user_admin():
+        st.success("""
+        **管理员权限：**
+        - ✅ 可以访问用户管理功能
+        - ✅ 可以查看所有用户信息
+        - ✅ 享有完整系统权限
+        """)
 
     # 系统状态检查
     col1, col2 = st.columns(2)
@@ -830,11 +1032,43 @@ elif page == "注册":
 
 # --- 用户管理页面 ---
 elif page == "用户管理":
+    # 多重安全检查：绝对禁止游客模式访问用户管理
+    if st.session_state.user_mode == "guest":
+        st.error("🚫 严重错误：游客模式禁止访问用户管理功能")
+        st.warning("⚠️ 检测到非法访问尝试，请通过正当渠道登录")
+        st.info("💡 如需使用此功能，请先注册并登录")
+        
+        # 提供返回主页的选项
+        col1, col2 = st.columns(2)
+        with col1:
+            if st.button("🏠 返回主页", type="primary"):
+                # 强制跳转到主页
+                st.session_state.show_main_app = True
+                st.rerun()
+        with col2:
+            if st.button("🔑 前往登录", type="secondary"):
+                logout_user()  # 清除游客状态，返回登录页面
+                st.rerun()
+        st.stop()
+    
+    # 检查是否已登录
     if not st.session_state.logged_in:
-        st.warning("请先登录以访问用户管理功能")
+        st.error("❌ 未登录用户无法访问用户管理功能")
+        st.info("💡 请先登录以访问此功能")
+        if st.button("前往登录"):
+            logout_user()
+            st.rerun()
+        st.stop()
+    
+    # 检查管理员权限
+    if not is_current_user_admin():
+        st.error("❌ 权限不足：只有管理员才能访问用户管理功能")
+        st.info("💡 当前用户无管理员权限")
+        st.warning("如果您是管理员，请确保您的姓名设置为'管理员'")
         st.stop()
     
     st.title("👥 用户管理")
+    st.success("✅ 管理员权限验证通过")
     
     # 用户信息卡片
     if st.session_state.user_info:
@@ -930,8 +1164,11 @@ elif page == "用户管理":
                         st.info("暂无用户数据")
                 else:
                     st.error(data.get("message", "获取用户列表失败"))
+            elif response.status_code == 403:
+                st.error("❌ 权限不足：您没有管理员权限，无法查看用户列表")
             else:
-                st.error("无权限查看用户列表或服务器错误")
+                error_data = response.json() if response.content else {}
+                st.error(f"服务器错误 ({response.status_code}): {error_data.get('detail', '未知错误')}")
         except Exception as e:
             st.error(f"获取用户列表失败: {str(e)}")
     

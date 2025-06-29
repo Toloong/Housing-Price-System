@@ -66,6 +66,20 @@ def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(securit
         raise HTTPException(status_code=401, detail="Invalid token")
     return result["user"]
 
+# 添加管理员权限检查函数
+def is_admin_user(user: dict) -> bool:
+    """检查用户是否为管理员"""
+    return user.get("full_name") == "管理员"
+
+def require_admin_permission(current_user: dict = Depends(get_current_user)):
+    """要求管理员权限的依赖项"""
+    if not is_admin_user(current_user):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="权限不足：需要管理员权限"
+        )
+    return current_user
+
 def get_optional_user(credentials: Optional[HTTPAuthorizationCredentials] = Depends(security)):
     """可选的用户认证（允许匿名访问）"""
     if not credentials:
@@ -565,13 +579,17 @@ def logout_user(current_user: dict = Depends(get_current_user)):
 @app.get("/auth/me")
 def get_current_user_info(current_user: dict = Depends(get_current_user)):
     """获取当前用户信息"""
+    # 添加管理员身份标识
+    user_info = current_user.copy()
+    user_info["is_admin"] = is_admin_user(current_user)
+    
     return {
         "success": True,
-        "user": current_user
+        "user": user_info
     }
 
 @app.get("/auth/users")
-def get_all_users(current_user: dict = Depends(get_current_user)):
+def get_all_users(current_user: dict = Depends(require_admin_permission)):
     """获取所有用户列表（管理员功能）"""
     try:
         result = UserManager.get_user_list()
