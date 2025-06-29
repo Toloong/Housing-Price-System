@@ -35,17 +35,28 @@ echo [5/5] Pushing to remote repository...
 echo Make sure remote repository is set up (git remote add origin <repo-url>)
 set /p push_confirm="Push to remote repository? (y/N): "
 if /i "%push_confirm%"=="y" (
-    git push origin main
+    echo Checking current branch...
+    for /f "tokens=*" %%i in ('git branch --show-current') do set current_branch=%%i
+    echo Current branch: %current_branch%
+    
+    git push origin %current_branch%
     if %errorlevel% neq 0 (
-        echo Push failed, please check remote repository settings
-        echo Manual push command: git push origin main
-        pause
-        exit /b 1
+        echo Push failed, trying to push to main branch...
+        git push origin HEAD:main
+        if %errorlevel% neq 0 (
+            echo Push failed, please check remote repository settings
+            echo Manual push commands:
+            echo   git push origin %current_branch%
+            echo   git push origin HEAD:main
+            pause
+            exit /b 1
+        )
     )
     echo Push successful!
 ) else (
     echo Skipping push, you can manually push later:
-    echo   git push origin main
+    for /f "tokens=*" %%i in ('git branch --show-current') do set current_branch=%%i
+    echo   git push origin %current_branch%
 )
 
 echo.
