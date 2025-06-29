@@ -4,9 +4,97 @@ import pandas as pd
 import plotly.express as px
 from streamlit_option_menu import option_menu
 import os
+import json
+from datetime import datetime
 
 # 设置页面配置
 st.set_page_config(page_title="房价分析系统", page_icon="🏠", layout="wide")
+
+# ================ 用户认证相关函数 ================
+
+def init_session_state():
+    """初始化会话状态"""
+    if 'logged_in' not in st.session_state:
+        st.session_state.logged_in = False
+    if 'user_info' not in st.session_state:
+        st.session_state.user_info = None
+    if 'auth_token' not in st.session_state:
+        st.session_state.auth_token = None
+
+def login_user(username, password):
+    """用户登录"""
+    try:
+        response = requests.post(f"{BACKEND_URL}/auth/login", json={
+            "username": username,
+            "password": password
+        })
+        
+        if response.status_code == 200:
+            data = response.json()
+            if data["success"]:
+                st.session_state.logged_in = True
+                st.session_state.user_info = data["user"]
+                st.session_state.auth_token = data["token"]
+                return True, "登录成功！"
+            else:
+                return False, data.get("message", "登录失败")
+        else:
+            error_data = response.json()
+            return False, error_data.get("detail", "登录失败")
+    except Exception as e:
+        return False, f"登录出错: {str(e)}"
+
+def register_user(username, email, password, full_name=None):
+    """用户注册"""
+    try:
+        response = requests.post(f"{BACKEND_URL}/auth/register", json={
+            "username": username,
+            "email": email,
+            "password": password,
+            "full_name": full_name
+        })
+        
+        if response.status_code == 200:
+            data = response.json()
+            return data["success"], data.get("message", "注册成功")
+        else:
+            error_data = response.json()
+            return False, error_data.get("detail", "注册失败")
+    except Exception as e:
+        return False, f"注册出错: {str(e)}"
+
+def logout_user():
+    """用户登出"""
+    st.session_state.logged_in = False
+    st.session_state.user_info = None
+    st.session_state.auth_token = None
+
+def get_auth_headers():
+    """获取认证请求头"""
+    if st.session_state.auth_token:
+        return {"Authorization": f"Bearer {st.session_state.auth_token}"}
+    return {}
+
+def check_login_status():
+    """检查登录状态"""
+    if st.session_state.logged_in and st.session_state.auth_token:
+        try:
+            response = requests.get(f"{BACKEND_URL}/auth/me", headers=get_auth_headers())
+            if response.status_code == 200:
+                return True
+            else:
+                # Token无效，清除登录状态
+                logout_user()
+                return False
+        except:
+            return False
+    return False
+
+# --- 后端 URL ---
+BACKEND_URL = "http://127.0.0.1:8000"
+
+# 初始化会话状态
+init_session_state()
 
 # --- 加载本地 CSS 文件 ---
 def load_css(file_name):
@@ -84,14 +172,45 @@ def initialize_page_state():
 initialize_page_state()
 
 # --- 页面选择 --- 
-page = option_menu(
-    menu_title=None,  # 标题已在页面顶部单独显示
-    options=["主页", "房价查询", "趋势分析", "城市对比", "数据洞察", "AI助手"],
-    icons=['house', 'search', 'graph-up', 'distribute-horizontal', 'clipboard-data', 'robot'],
-    menu_icon="cast",
-    default_index=0,
-    orientation="horizontal",
-)
+# 检查登录状态
+if st.session_state.logged_in:
+    # 已登录用户的导航栏
+    col1, col2 = st.columns([4, 1])
+    with col1:
+        page = option_menu(
+            menu_title=None,
+            options=["主页", "房价查询", "趋势分析", "城市对比", "数据洞察", "AI助手", "用户管理"],
+            icons=['house', 'search', 'graph-up', 'distribute-horizontal', 'clipboard-data', 'robot', 'people'],
+            menu_icon="cast",
+            default_index=0,
+            orientation="horizontal",
+        )
+    with col2:
+        # 用户信息和登出按钮
+        if st.session_state.user_info:
+            st.write(f"👤 {st.session_state.user_info.get('username', '用户')}")
+        if st.button("登出", type="secondary"):
+            logout_user()
+            st.rerun()
+else:
+    # 未登录用户的导航栏
+    col1, col2 = st.columns([4, 1])
+    with col1:
+        page = option_menu(
+            menu_title=None,
+            options=["主页", "房价查询", "趋势分析", "城市对比", "数据洞察", "AI助手"],
+            icons=['house', 'search', 'graph-up', 'distribute-horizontal', 'clipboard-data', 'robot'],
+            menu_icon="cast",
+            default_index=0,
+            orientation="horizontal",
+        )
+    with col2:
+        # 登录/注册按钮
+        auth_option = st.selectbox("", ["登录", "注册"], label_visibility="collapsed")
+        if auth_option == "登录":
+            page = "登录"
+        else:
+            page = "注册"
 
 # --- 主页 ---
 if page == "主页":
@@ -604,4 +723,187 @@ if page == "AI助手":
         - 可以询问具体区域的详细信息
         - 支持自然语言提问，如"北京房价如何？"
         - 点击建议问题快速开始分析
+        """)
+
+# --- 登录页面 ---
+elif page == "登录":
+    st.title("🔐 用户登录")
+    
+    with st.form("login_form"):
+        st.markdown("### 请输入登录信息")
+        username = st.text_input("用户名/邮箱", placeholder="请输入用户名或邮箱")
+        password = st.text_input("密码", type="password", placeholder="请输入密码")
+        
+        submit_button = st.form_submit_button("登录", type="primary")
+        
+        if submit_button:
+            if username and password:
+                success, message = login_user(username, password)
+                if success:
+                    st.success(message)
+                    st.rerun()
+                else:
+                    st.error(message)
+            else:
+                st.warning("请填写所有字段")
+    
+    st.markdown("---")
+    st.info("没有账号？请选择右上角的'注册'选项")
+
+# --- 注册页面 ---
+elif page == "注册":
+    st.title("📝 用户注册")
+    
+    with st.form("register_form"):
+        st.markdown("### 创建新账号")
+        username = st.text_input("用户名", placeholder="3-20位字母、数字、下划线", help="用户名长度3-20位，只能包含字母、数字、下划线")
+        email = st.text_input("邮箱", placeholder="请输入有效邮箱地址")
+        full_name = st.text_input("姓名", placeholder="请输入真实姓名（可选）")
+        password = st.text_input("密码", type="password", placeholder="密码长度至少6位", help="密码长度至少6位")
+        confirm_password = st.text_input("确认密码", type="password", placeholder="请再次输入密码")
+        
+        submit_button = st.form_submit_button("注册", type="primary")
+        
+        if submit_button:
+            if username and email and password and confirm_password:
+                if password != confirm_password:
+                    st.error("两次输入的密码不一致")
+                elif len(password) < 6:
+                    st.error("密码长度至少6位")
+                else:
+                    success, message = register_user(username, email, password, full_name if full_name else None)
+                    if success:
+                        st.success(message)
+                        st.info("注册成功！请选择右上角的'登录'选项登录")
+                    else:
+                        st.error(message)
+            else:
+                st.warning("请填写所有必填字段（姓名可选）")
+    
+    st.markdown("---")
+    st.info("已有账号？请选择右上角的'登录'选项")
+
+# --- 用户管理页面 ---
+elif page == "用户管理":
+    if not st.session_state.logged_in:
+        st.warning("请先登录以访问用户管理功能")
+        st.stop()
+    
+    st.title("👥 用户管理")
+    
+    # 用户信息卡片
+    if st.session_state.user_info:
+        user = st.session_state.user_info
+        
+        col1, col2 = st.columns([2, 1])
+        
+        with col1:
+            st.subheader("个人信息")
+            with st.container():
+                st.markdown(f"""
+                **用户ID**: {user.get('id')}  
+                **用户名**: {user.get('username')}  
+                **邮箱**: {user.get('email')}  
+                **姓名**: {user.get('full_name', '未设置')}  
+                **创建时间**: {user.get('created_at', '未知')}  
+                **最后登录**: {user.get('last_login', '未知')}
+                """)
+        
+        with col2:
+            st.subheader("账户操作")
+            if st.button("🔄 刷新信息", type="secondary"):
+                # 重新获取用户信息
+                try:
+                    response = requests.get(f"{BACKEND_URL}/auth/me", headers=get_auth_headers())
+                    if response.status_code == 200:
+                        data = response.json()
+                        st.session_state.user_info = data["user"]
+                        st.success("信息已更新")
+                        st.rerun()
+                    else:
+                        st.error("获取用户信息失败")
+                except Exception as e:
+                    st.error(f"刷新失败: {str(e)}")
+            
+            if st.button("🚪 登出", type="primary"):
+                logout_user()
+                st.success("已登出")
+                st.rerun()
+    
+    st.markdown("---")
+    
+    # 用户列表（管理员功能）
+    st.subheader("📋 用户列表")
+    
+    if st.button("🔄 刷新用户列表"):
+        try:
+            response = requests.get(f"{BACKEND_URL}/auth/users", headers=get_auth_headers())
+            if response.status_code == 200:
+                data = response.json()
+                if data["success"]:
+                    users_data = data["users"]
+                    
+                    if users_data:
+                        # 转换为DataFrame并显示
+                        df_users = pd.DataFrame(users_data)
+                        
+                        # 格式化时间列
+                        if 'created_at' in df_users.columns:
+                            df_users['created_at'] = pd.to_datetime(df_users['created_at']).dt.strftime('%Y-%m-%d %H:%M')
+                        if 'last_login' in df_users.columns:
+                            df_users['last_login'] = pd.to_datetime(df_users['last_login'], errors='coerce').dt.strftime('%Y-%m-%d %H:%M')
+                        
+                        # 重命名列
+                        column_mapping = {
+                            'id': 'ID',
+                            'username': '用户名',
+                            'email': '邮箱',
+                            'full_name': '姓名',
+                            'created_at': '创建时间',
+                            'last_login': '最后登录',
+                            'is_active': '状态'
+                        }
+                        df_display = df_users.rename(columns=column_mapping)
+                        
+                        # 状态格式化
+                        if '状态' in df_display.columns:
+                            df_display['状态'] = df_display['状态'].map({True: '✅ 活跃', False: '❌ 禁用'})
+                        
+                        st.dataframe(df_display, use_container_width=True)
+                        
+                        # 统计信息
+                        col1, col2, col3 = st.columns(3)
+                        with col1:
+                            st.metric("总用户数", len(users_data))
+                        with col2:
+                            active_users = sum(1 for user in users_data if user.get('is_active', False))
+                            st.metric("活跃用户", active_users)
+                        with col3:
+                            recent_users = sum(1 for user in users_data if user.get('last_login'))
+                            st.metric("有登录记录", recent_users)
+                    else:
+                        st.info("暂无用户数据")
+                else:
+                    st.error(data.get("message", "获取用户列表失败"))
+            else:
+                st.error("无权限查看用户列表或服务器错误")
+        except Exception as e:
+            st.error(f"获取用户列表失败: {str(e)}")
+    
+    # 使用说明
+    with st.expander("📚 用户管理说明"):
+        st.markdown("""
+        **个人信息**：
+        - 查看和管理您的账户信息
+        - 刷新最新的登录状态
+        
+        **用户列表**：
+        - 查看系统中所有注册用户
+        - 查看用户活跃状态和登录记录
+        - 提供用户统计信息
+        
+        **安全提示**：
+        - 定期更换密码保护账户安全
+        - 不要在公共电脑上保持长期登录
+        - 发现异常登录请及时联系管理员
         """)

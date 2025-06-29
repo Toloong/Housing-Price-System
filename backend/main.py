@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Depends, status
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import pandas as pd
@@ -8,6 +8,21 @@ import datetime
 import os
 import json
 from typing import Optional
+
+# 导入用户管理相关模块
+try:
+    from backend.database import init_connection_pool, create_tables, UserManager, log_user_activity
+    from backend.auth import (
+        UserRegister, UserLogin, LoginResponse, UserResponse,
+        validate_username, validate_password, get_current_user, get_optional_user
+    )
+except ImportError:
+    # 备用导入方式
+    from database import init_connection_pool, create_tables, UserManager, log_user_activity
+    from auth import (
+        UserRegister, UserLogin, LoginResponse, UserResponse,
+        validate_username, validate_password, get_current_user, get_optional_user
+    )
 
 app = FastAPI(title="房价分析系统后端API")
 
@@ -19,6 +34,18 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# 初始化数据库
+@app.on_event("startup")
+async def startup_event():
+    """应用启动时初始化数据库"""
+    print("正在初始化数据库连接...")
+    if init_connection_pool():
+        print("正在创建数据库表...")
+        create_tables()
+        print("数据库初始化完成")
+    else:
+        print("警告: 数据库连接失败，用户管理功能将不可用")
 
 # 数据加载
 DATA_PATH = os.path.join(os.path.dirname(__file__), '..', 'data', 'housing_data.csv')
@@ -376,3 +403,175 @@ def get_cities():
         return {"cities": cities}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"获取城市列表失败: {str(e)}")
+
+
+# ==================== 用户管理API接口 ====================
+
+@app.post("/auth/register", response_model=dict)
+def register_user(user_data: UserRegister):
+    """用户注册"""
+    try:
+        # 验证用户名格式
+        if not validate_username(user_data.username):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="用户名格式不正确，长度3-20位，只能包含字母、数字、下划线"
+            )
+        
+        # 验证密码强度
+        if not validate_password(user_data.password):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="密码长度至少6位"
+            )
+        
+        result = UserManager.create_user(
+            username=user_data.username,
+            email=user_data.email,
+            password=user_data.password,
+            full_name=user_data.full_name
+        )
+        
+        if result["success"]:
+            return {
+                "success": True,
+                "message": result["message"],
+                "user": result["user"]
+            }
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=result["message"]
+            )
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"注册失败: {str(e)}"
+        )
+
+@app.post("/auth/login")
+def login_user(login_data: UserLogin):
+    """用户登录"""
+    try:
+        result = UserManager.authenticate_user(
+            username=login_data.username,
+            password=login_data.password
+        )
+        
+        if result["success"]:
+            # 记录登录活动
+            log_user_activity(
+                user_id=result["user"]["id"],
+                activity_type="login",
+                activity_data={"ip": "127.0.0.1"}  # 在实际部署中可以获取真实IP
+            )
+            
+            return {
+                "success": True,
+                "message": result["message"],
+                "user": result["user"],
+                "token": result["token"],
+                "expires_at": result["expires_at"]
+            }
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail=result["message"]
+            )
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"登录失败: {str(e)}"
+        )
+
+@app.post("/auth/logout")
+def logout_user(current_user: dict = Depends(get_current_user)):
+    """用户登出"""
+    try:
+        # 注意：这里需要从请求头获取token，实际实现可能需要调整
+        # 为简化，我们记录登出活动
+        log_user_activity(
+            user_id=current_user["id"],
+            activity_type="logout"
+        )
+        
+        return {"success": True, "message": "登出成功"}
+        
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"登出失败: {str(e)}"
+        )
+
+@app.get("/auth/me")
+def get_current_user_info(current_user: dict = Depends(get_current_user)):
+    """获取当前用户信息"""
+    return {
+        "success": True,
+        "user": current_user
+    }
+
+@app.get("/auth/users")
+def get_all_users(current_user: dict = Depends(get_current_user)):
+    """获取所有用户列表（管理员功能）"""
+    try:
+        result = UserManager.get_user_list()
+        
+        if result["success"]:
+            # 记录查看用户列表活动
+            log_user_activity(
+                user_id=current_user["id"],
+                activity_type="view_users"
+            )
+            
+            return {
+                "success": True,
+                "users": result["users"]
+            }
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=result["message"]
+            )
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"获取用户列表失败: {str(e)}"
+        )
+
+# ==================== 需要登录的房价分析接口 ====================
+
+@app.get("/protected/search")
+def protected_search(city: str, current_user: dict = Depends(get_current_user)):
+    """需要登录的房价搜索（示例）"""
+    # 记录用户活动
+    log_user_activity(
+        user_id=current_user["id"],
+        activity_type="search",
+        activity_data={"city": city}
+    )
+    
+    # 调用原有的搜索功能
+    return search(city)
+
+@app.get("/protected/trend")
+def protected_trend(city: str, area: str, current_user: dict = Depends(get_current_user)):
+    """需要登录的趋势分析（示例）"""
+    # 记录用户活动
+    log_user_activity(
+        user_id=current_user["id"],
+        activity_type="trend_analysis",
+        activity_data={"city": city, "area": area}
+    )
+    
+    # 调用原有的趋势分析功能
+    return trend(city, area)
