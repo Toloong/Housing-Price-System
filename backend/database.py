@@ -1,56 +1,77 @@
 """
-数据库连接和模型定义
+SQLite数据库适配器 - PostgreSQL编码问题的替代方案
 """
-import psycopg2
-import psycopg2.extras
-from psycopg2.pool import SimpleConnectionPool
-import os
+import sqlite3
 import hashlib
 import secrets
 from datetime import datetime, timedelta
 from typing import Optional, Dict, Any
 import json
+import os
 
-# 数据库配置
-DB_CONFIG = {
-    'host': 'localhost',
-    'port': 5432,
-    'database': 'Housing_Price_postgres',
-    'user': 'Housing_Price_postgres',
-    'password': '123456'
-}
+# SQLite数据库路径
+DB_PATH = os.path.join(os.path.dirname(__file__), 'housing_price.db')
 
-# 连接池
-connection_pool = None
-
-def init_connection_pool():
-    """初始化数据库连接池"""
-    global connection_pool
+def init_sqlite_database():
+    """初始化SQLite数据库"""
     try:
-        connection_pool = SimpleConnectionPool(
-            minconn=1,
-            maxconn=20,
-            **DB_CONFIG
-        )
-        print("数据库连接池初始化成功")
+        conn = sqlite3.connect(DB_PATH)
+        cursor = conn.cursor()
+        
+        # 创建用户表
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS users (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                username TEXT UNIQUE NOT NULL,
+                email TEXT UNIQUE NOT NULL,
+                password_hash TEXT NOT NULL,
+                full_name TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                last_login TIMESTAMP,
+                is_active BOOLEAN DEFAULT 1
+            )
+        """)
+        
+        # 创建用户令牌表
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS user_tokens (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+                token TEXT UNIQUE NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                expires_at TIMESTAMP NOT NULL
+            )
+        """)
+        
+        # 创建用户活动日志表
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS user_activity_logs (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+                activity_type TEXT NOT NULL,
+                activity_data TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        
+        # 创建索引
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_users_username ON users(username)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_users_email ON users(email)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_user_tokens_token ON user_tokens(token)")
+        
+        conn.commit()
+        cursor.close()
+        conn.close()
+        
+        print(f"SQLite数据库初始化成功: {DB_PATH}")
         return True
+        
     except Exception as e:
-        print(f"数据库连接池初始化失败: {e}")
+        print(f"SQLite数据库初始化失败: {e}")
         return False
 
-def get_connection():
-    """从连接池获取数据库连接"""
-    if connection_pool:
-        return connection_pool.getconn()
-    return None
-
-def put_connection(conn):
-    """将连接返回到连接池"""
-    if connection_pool and conn:
-        connection_pool.putconn(conn)
-
-class UserManager:
-    """用户管理类"""
+class SQLiteUserManager:
+    """SQLite用户管理类"""
     
     @staticmethod
     def hash_password(password: str) -> str:
@@ -65,166 +86,137 @@ class UserManager:
     @staticmethod
     def create_user(username: str, email: str, password: str, full_name: str = None) -> Dict[str, Any]:
         """创建新用户"""
-        conn = get_connection()
-        if not conn:
-            return {"success": False, "message": "数据库连接失败"}
-        
         try:
-            cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+            conn = sqlite3.connect(DB_PATH)
+            conn.row_factory = sqlite3.Row
+            cursor = conn.cursor()
             
             # 检查用户名是否已存在
-            cursor.execute("SELECT id FROM users WHERE username = %s OR email = %s", (username, email))
+            cursor.execute("SELECT id FROM users WHERE username = ? OR email = ?", (username, email))
             if cursor.fetchone():
+                conn.close()
                 return {"success": False, "message": "用户名或邮箱已存在"}
             
             # 创建用户
-            hashed_password = UserManager.hash_password(password)
-            created_at = datetime.now()
+            hashed_password = SQLiteUserManager.hash_password(password)
+            created_at = datetime.now().isoformat()
             
             cursor.execute("""
                 INSERT INTO users (username, email, password_hash, full_name, created_at, is_active)
-                VALUES (%s, %s, %s, %s, %s, %s)
-                RETURNING id, username, email, full_name, created_at
-            """, (username, email, hashed_password, full_name, created_at, True))
+                VALUES (?, ?, ?, ?, ?, ?)
+            """, (username, email, hashed_password, full_name, created_at, 1))
             
-            user = cursor.fetchone()
+            user_id = cursor.lastrowid
+            
+            # 获取创建的用户信息
+            cursor.execute("SELECT * FROM users WHERE id = ?", (user_id,))
+            user = dict(cursor.fetchone())
+            
             conn.commit()
+            conn.close()
             
             return {
                 "success": True, 
                 "message": "用户创建成功",
-                "user": dict(user)
+                "user": user
             }
             
         except Exception as e:
-            conn.rollback()
             return {"success": False, "message": f"创建用户失败: {str(e)}"}
-        finally:
-            cursor.close()
-            put_connection(conn)
     
     @staticmethod
     def authenticate_user(username: str, password: str) -> Dict[str, Any]:
         """用户登录认证"""
-        conn = get_connection()
-        if not conn:
-            return {"success": False, "message": "数据库连接失败"}
-        
         try:
-            cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+            conn = sqlite3.connect(DB_PATH)
+            conn.row_factory = sqlite3.Row
+            cursor = conn.cursor()
             
-            hashed_password = UserManager.hash_password(password)
+            hashed_password = SQLiteUserManager.hash_password(password)
             cursor.execute("""
                 SELECT id, username, email, full_name, created_at, last_login
                 FROM users 
-                WHERE (username = %s OR email = %s) AND password_hash = %s AND is_active = TRUE
+                WHERE (username = ? OR email = ?) AND password_hash = ? AND is_active = 1
             """, (username, username, hashed_password))
             
-            user = cursor.fetchone()
-            if not user:
+            user_row = cursor.fetchone()
+            if not user_row:
+                conn.close()
                 return {"success": False, "message": "用户名/邮箱或密码错误"}
             
+            user = dict(user_row)
+            
             # 生成访问令牌
-            token = UserManager.generate_token()
+            token = SQLiteUserManager.generate_token()
             expires_at = datetime.now() + timedelta(days=7)  # 7天过期
             
             # 保存令牌
             cursor.execute("""
                 INSERT INTO user_tokens (user_id, token, expires_at)
-                VALUES (%s, %s, %s)
-            """, (user['id'], token, expires_at))
+                VALUES (?, ?, ?)
+            """, (user['id'], token, expires_at.isoformat()))
             
             # 更新最后登录时间
             cursor.execute("""
-                UPDATE users SET last_login = %s WHERE id = %s
-            """, (datetime.now(), user['id']))
+                UPDATE users SET last_login = ? WHERE id = ?
+            """, (datetime.now().isoformat(), user['id']))
             
             conn.commit()
+            conn.close()
             
             return {
                 "success": True,
                 "message": "登录成功",
-                "user": dict(user),
+                "user": user,
                 "token": token,
                 "expires_at": expires_at.isoformat()
             }
             
         except Exception as e:
-            conn.rollback()
             return {"success": False, "message": f"登录失败: {str(e)}"}
-        finally:
-            cursor.close()
-            put_connection(conn)
     
     @staticmethod
     def verify_token(token: str) -> Dict[str, Any]:
         """验证访问令牌"""
-        conn = get_connection()
-        if not conn:
-            return {"success": False, "message": "数据库连接失败"}
-        
         try:
-            cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+            conn = sqlite3.connect(DB_PATH)
+            conn.row_factory = sqlite3.Row
+            cursor = conn.cursor()
             
             cursor.execute("""
                 SELECT ut.user_id, ut.expires_at, u.username, u.email, u.full_name
                 FROM user_tokens ut
                 JOIN users u ON ut.user_id = u.id
-                WHERE ut.token = %s AND ut.expires_at > %s AND u.is_active = TRUE
-            """, (token, datetime.now()))
+                WHERE ut.token = ? AND ut.expires_at > ? AND u.is_active = 1
+            """, (token, datetime.now().isoformat()))
             
             result = cursor.fetchone()
+            conn.close()
+            
             if not result:
                 return {"success": False, "message": "令牌无效或已过期"}
             
+            result_dict = dict(result)
             return {
                 "success": True,
                 "user": {
-                    "id": result['user_id'],
-                    "username": result['username'],
-                    "email": result['email'],
-                    "full_name": result['full_name']
+                    "id": result_dict['user_id'],
+                    "username": result_dict['username'],
+                    "email": result_dict['email'],
+                    "full_name": result_dict['full_name']
                 }
             }
             
         except Exception as e:
             return {"success": False, "message": f"令牌验证失败: {str(e)}"}
-        finally:
-            cursor.close()
-            put_connection(conn)
-    
-    @staticmethod
-    def logout_user(token: str) -> Dict[str, Any]:
-        """用户登出"""
-        conn = get_connection()
-        if not conn:
-            return {"success": False, "message": "数据库连接失败"}
-        
-        try:
-            cursor = conn.cursor()
-            
-            # 删除令牌
-            cursor.execute("DELETE FROM user_tokens WHERE token = %s", (token,))
-            conn.commit()
-            
-            return {"success": True, "message": "登出成功"}
-            
-        except Exception as e:
-            conn.rollback()
-            return {"success": False, "message": f"登出失败: {str(e)}"}
-        finally:
-            cursor.close()
-            put_connection(conn)
     
     @staticmethod
     def get_user_list() -> Dict[str, Any]:
-        """获取用户列表（管理员功能）"""
-        conn = get_connection()
-        if not conn:
-            return {"success": False, "message": "数据库连接失败"}
-        
+        """获取用户列表"""
         try:
-            cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+            conn = sqlite3.connect(DB_PATH)
+            conn.row_factory = sqlite3.Row
+            cursor = conn.cursor()
             
             cursor.execute("""
                 SELECT id, username, email, full_name, created_at, last_login, is_active
@@ -232,103 +224,50 @@ class UserManager:
                 ORDER BY created_at DESC
             """)
             
-            users = cursor.fetchall()
+            users = [dict(user) for user in cursor.fetchall()]
+            conn.close()
             
             return {
                 "success": True,
-                "users": [dict(user) for user in users]
+                "users": users
             }
             
         except Exception as e:
             return {"success": False, "message": f"获取用户列表失败: {str(e)}"}
-        finally:
-            cursor.close()
-            put_connection(conn)
 
-def create_tables():
-    """创建数据库表"""
-    conn = get_connection()
-    if not conn:
-        print("无法连接数据库")
-        return False
-    
-    try:
-        cursor = conn.cursor()
-        
-        # 创建用户表
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS users (
-                id SERIAL PRIMARY KEY,
-                username VARCHAR(50) UNIQUE NOT NULL,
-                email VARCHAR(100) UNIQUE NOT NULL,
-                password_hash VARCHAR(255) NOT NULL,
-                full_name VARCHAR(100),
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                last_login TIMESTAMP,
-                is_active BOOLEAN DEFAULT TRUE
-            )
-        """)
-        
-        # 创建用户令牌表
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS user_tokens (
-                id SERIAL PRIMARY KEY,
-                user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
-                token VARCHAR(255) UNIQUE NOT NULL,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                expires_at TIMESTAMP NOT NULL
-            )
-        """)
-        
-        # 创建用户活动日志表
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS user_activity_logs (
-                id SERIAL PRIMARY KEY,
-                user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
-                activity_type VARCHAR(50) NOT NULL,
-                activity_data JSONB,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )
-        """)
-        
-        # 创建索引
-        cursor.execute("CREATE INDEX IF NOT EXISTS idx_users_username ON users(username)")
-        cursor.execute("CREATE INDEX IF NOT EXISTS idx_users_email ON users(email)")
-        cursor.execute("CREATE INDEX IF NOT EXISTS idx_user_tokens_token ON user_tokens(token)")
-        cursor.execute("CREATE INDEX IF NOT EXISTS idx_user_tokens_expires ON user_tokens(expires_at)")
-        
-        conn.commit()
-        print("数据库表创建成功")
-        return True
-        
-    except Exception as e:
-        conn.rollback()
-        print(f"创建数据库表失败: {e}")
-        return False
-    finally:
-        cursor.close()
-        put_connection(conn)
-
-# 记录用户活动
-def log_user_activity(user_id: int, activity_type: str, activity_data: dict = None):
+def log_sqlite_user_activity(user_id: int, activity_type: str, activity_data: dict = None):
     """记录用户活动日志"""
-    conn = get_connection()
-    if not conn:
-        return
-    
     try:
+        conn = sqlite3.connect(DB_PATH)
         cursor = conn.cursor()
         
         cursor.execute("""
             INSERT INTO user_activity_logs (user_id, activity_type, activity_data)
-            VALUES (%s, %s, %s)
+            VALUES (?, ?, ?)
         """, (user_id, activity_type, json.dumps(activity_data) if activity_data else None))
         
         conn.commit()
+        conn.close()
         
     except Exception as e:
-        conn.rollback()
         print(f"记录用户活动失败: {e}")
-    finally:
-        cursor.close()
-        put_connection(conn)
+
+if __name__ == "__main__":
+    # 初始化数据库
+    if init_sqlite_database():
+        print("SQLite数据库初始化完成")
+        
+        # 创建测试用户
+        result = SQLiteUserManager.create_user(
+            username="admin",
+            email="admin@example.com", 
+            password="123456",
+            full_name="管理员"
+        )
+        
+        if result["success"]:
+            print("测试管理员账户创建成功")
+        else:
+            print(f"创建测试账户失败: {result['message']}")
+    else:
+        print("SQLite数据库初始化失败")

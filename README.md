@@ -1,814 +1,268 @@
-# 房价分析系统 v3.0
+# 房价分析系统
 
-本项目是一个全栈房价分析应用，旨在提供一个集数据采集、分析与可视化于一体的专业平台。
-
-- **后端**: 使用 **FastAPI** 构建，提供高效、标准的 API 接口。
-- **前端**: 使用 **Streamlit** 构建，提供一个交互式、响应迅速的用户界面。
-- **数据**: 包含6个主要城市、1080条房价记录，覆盖30个月历史数据。
-- **AI助手**: 集成智能分析算法，提供专业的投资建议和市场洞察。
-- **用户管理**: 完整的用户认证系统，支持注册、登录、权限管理。
-
-## 主要功能
-
-- **房价查询**: 按城市快速搜索和展示房价数据。
-- **趋势分析**: 
-  - 单个区域分析：可视化特定城市、特定区域的房价历史走势
-  - 城市全景分析：一键查看城市所有区域的房价趋势对比，包含排名和统计信息
-- **城市对比**: 并排比较多个城市的房价指标。
-- **数据洞察**: 对单个城市的房价数据进行深入的统计分析，发现数据背后的故事。
-- **AI助手**: 🤖 智能分析房价数据，支持自然语言查询，提供个性化投资建议和市场洞察。
-- **用户管理**: 👥 完整的用户注册、登录、身份验证系统，数据安全存储在PostgreSQL数据库中。
-- **数据爬取**: 基于Scrapy框架的智能爬虫系统，支持数据自动更新。
-
-## 技术栈
-
-- **后端**: Python, FastAPI, PostgreSQL
-- **前端**: Python, Streamlit, streamlit-option-menu
-- **数据处理**: Pandas
-- **数据爬取**: Scrapy
-- **用户认证**: JWT Token, SHA256密码哈希
-
-### 主要依赖包
-```
-fastapi              # Web框架
-uvicorn              # ASGI服务器
-psycopg2-binary      # PostgreSQL适配器
-pandas               # 数据处理
-requests             # HTTP客户端
-plotly               # 数据可视化
-streamlit            # 前端框架
-streamlit-option-menu # 导航组件
-scrapy               # 爬虫框架
-pydantic             # 数据验证
-python-dateutil      # 日期处理
-email-validator      # 邮箱验证
-```
-
-## 目录结构
-
-```
-.
-├── backend/
-│   ├── main.py           # FastAPI 应用主文件
-│   ├── database.py       # 数据库连接和用户管理
-│   └── auth.py           # 用户认证和权限控制
-├── data/
-│   └── housing_data.csv    # 房价数据
-├── frontend/
-│   ├── app.py            # Streamlit 应用主文件
-│   └── style.css         # 前端自定义样式
-├── scraper/
-│   ├── housing_spider/   # Scrapy 爬虫项目
-│   │   ├── spiders/
-│   │   │   └── housing_spider.py # 爬虫实现
-│   │   ├── items.py      # 数据结构定义
-│   │   ├── pipelines.py  # 数据处理管道
-│   │   └── settings.py   # 爬虫配置
-│   └── mock_data.html    # 爬虫使用的HTML模板
-├── init_database.py      # 数据库初始化脚本
-├── test_user_management.py # 用户管理功能测试
-├── install.bat           # Windows一键安装程序
-├── setup_postgresql.ps1  # PostgreSQL快速设置脚本 (Windows)
-├── start_system.sh       # 系统启动脚本 (Linux/macOS)
-├── start_system.bat      # 系统启动脚本 (Windows)
-├── conversation_history.md # 开发历程记录
-└── requirements.txt      # Python依赖包列表
-```
+基于 FastAPI + Streamlit + SQLite 的房价数据分析系统，支持用户管理和数据可视化。
 
 ## 🚀 快速开始
 
-### 方式一：一键安装（Windows用户推荐）
-
-**Windows用户专享：**
-```cmd
-# 一键安装程序（推荐新用户）
-install.bat
-```
-
-### 方式二：脚本启动（推荐）
-
-**Windows用户：**
-```powershell
-# PowerShell脚本（推荐）
-.\start_system.ps1
-
-# 或批处理脚本
-start_system.bat
-```
-
-**Linux/macOS用户：**
+### 环境安装（首次使用）
 ```bash
-# 1. 安装依赖
-pip install -r requirements.txt
-
-# 2. 运行启动脚本
-./start_system.sh
+# Windows一键安装
+setup.bat
 ```
 
-### 方式三：手动步骤
-
-1. **PostgreSQL设置**（可选，用于用户管理功能）
-   
-   **Windows用户：**
-   ```powershell
-   # 运行PostgreSQL设置脚本
-   .\setup_postgresql.ps1
-   ```
-   
-   **Linux/macOS用户：**
-   ```bash
-   # 重置postgres密码
-   sudo -u postgres psql -c "ALTER USER postgres PASSWORD '123456';"
-   
-   # 或运行PostgreSQL设置脚本
-   ./setup_postgresql.sh
-   ```
-
-2. **数据库初始化**（可选）
-   ```bash
-   python3 init_database.py
-   ```
-
-3. **启动服务**
-   ```bash
-   # 启动后端（终端1）
-   uvicorn backend.main:app --reload --port 8000
-   
-   # 启动前端（终端2）
-   streamlit run frontend/app.py
-   ```
-
-4. **访问应用**
-   - 前端：http://localhost:8501
-   - 后端API：http://localhost:8000
-   - API文档：http://localhost:8000/docs
-
-## 🪟 Windows用户完整指南
-
-为Windows用户提供了完整的脚本工具集，实现一键安装和启动：
-
-### 📋 系统要求
-
-**必需软件**：
-- Windows 10/11
-- Python 3.8+ （从 https://python.org 下载，安装时务必勾选"Add to PATH"）
-
-**可选软件**（用于完整功能）：
-- PostgreSQL 12+ （从 https://www.postgresql.org/download/windows/ 下载，安装时记住postgres用户密码）
-
-### 🚀 安装方式选择
-
-#### 方式1: 一键安装程序（推荐新用户）
-
-**适用场景**: 首次使用，希望全自动安装
-
-```cmd
-# 双击运行一键安装程序
-install.bat
+### 一键启动（推荐）
+```bash
+# Windows
+start.bat
 ```
 
-**特点**:
-- ✅ 全自动安装流程，友好的图形界面
-- ✅ 智能错误检测，可选数据库配置
-- ✅ 安装完成后自动启动系统
+### 手动启动
+```bash
+# 1. 激活虚拟环境
+.\.venv\Scripts\activate
 
-#### 方式2: PowerShell脚本（推荐日常使用）
+# 2. 启动后端API
+python -m uvicorn backend.main:app --reload --port 8000
 
-**适用场景**: 日常启动，需要灵活控制
-
-```powershell
-# 右键项目文件夹 → "在终端中打开" 或 "PowerShell"
-.\start_system.ps1
+# 3. 启动前端界面（新终端）
+streamlit run frontend/app.py --server.port 8501
 ```
 
-**特点**:
-- ✅ 智能环境检测，自动依赖管理
-- ✅ 多种启动模式，详细状态提示
+## 📱 访问地址
 
-#### 方式3: 批处理脚本（兼容模式）
+- **前端界面**: http://localhost:8501
+- **后端API**: http://localhost:8000
+- **API文档**: http://localhost:8000/docs
 
-**适用场景**: 无法运行PowerShell脚本的环境
+## 🗂️ 项目结构
 
-```cmd
-# 双击运行批处理脚本
-start_system.bat
+```
+Housing_Price/
+├── backend/                 # 后端API服务
+│   ├── main.py             # FastAPI主应用
+│   ├── database.py         # SQLite数据库管理
+│   └── housing_price.db    # SQLite数据库文件
+├── frontend/               # 前端界面
+│   ├── app.py             # Streamlit主应用
+│   └── style.css          # 样式文件
+├── data/                  # 数据文件
+│   └── housing_data.csv   # 房价数据
+├── scraper/               # 数据爬虫(可选)
+├── start.bat              # 一键启动脚本
+├── requirements.txt       # Python依赖
+└── README.md             # 项目说明
 ```
 
-**特点**:
-- ✅ 最大兼容性，无需PowerShell权限
-- ✅ 图形化选择界面
+## 🔐 测试账户
 
-#### 方式4: 手动安装（高级用户）
+| 用户名 | 密码 | 邮箱 |
+|--------|------|------|
+| testuser | password123 | test@example.com |
+| testuser2 | password123 | test2@example.com |
 
-**适用场景**: 需要自定义配置或学习系统结构
+## ⚡ 功能特性
 
-```cmd
+### 🏠 房价分析
+- 城市房价查询
+- 历史趋势分析  
+- 区域价格对比
+- 数据可视化图表
+- AI智能分析助手
+
+### 👥 用户管理
+- 用户注册/登录
+- JWT令牌认证
+- 用户权限管理
+- 活动日志记录
+
+### 🤖 AI助手功能
+- 房价趋势智能分析
+- 投资建议生成
+- 市场洞察报告
+- 自然语言查询
+
+### 🔧 技术栈
+- **后端**: FastAPI, SQLite, Pydantic
+- **前端**: Streamlit, Pandas, Plotly
+- **数据**: CSV数据源，支持爬虫扩展
+- **认证**: JWT令牌认证
+
+## 📦 安装依赖
+
+### 自动安装（推荐）
+```bash
+# Windows - 一键安装环境
+setup.bat
+```
+
+### 手动安装
+```bash
 # 1. 创建虚拟环境
 python -m venv .venv
 
 # 2. 激活虚拟环境
-.venv\Scripts\activate
+# Windows
+.\.venv\Scripts\activate
+# Linux/Mac
+source .venv/bin/activate
 
 # 3. 安装依赖
+pip install --upgrade pip
 pip install -r requirements.txt
 
-# 4. 配置数据库（可选）
-python init_database.py
-
-# 5. 启动后端（新终端）
-.venv\Scripts\activate
-uvicorn backend.main:app --reload --port 8000
-
-# 6. 启动前端（另一个新终端）
-.venv\Scripts\activate
-streamlit run frontend/app.py
+# 4. 初始化数据库
+python -c "from backend.database import init_sqlite_database; init_sqlite_database()"
 ```
 
-### Windows启动脚本说明
+## 🔧 开发说明
 
-| 脚本文件 | 适用场景 | 功能说明 |
-|---------|---------|---------|
-| `install.bat` | 首次安装 | 🎯 一键安装程序，包含ASCII界面，适合新用户 |
-| `start_system.ps1` | 日常使用 | ⚡ PowerShell脚本，功能最完整，推荐使用 |
-| `start_system.bat` | 兼容性 | 🔧 批处理脚本，适合无法运行PowerShell的环境 |
-| `setup_postgresql.ps1` | 数据库配置 | 🐘 PostgreSQL自动配置脚本 |
+### 主要API接口
 
-### Windows脚本特性
+#### 房价分析接口
+- `GET /search?city=城市名` - 房价查询
+- `GET /trend?city=城市名&area=区域` - 趋势分析
+- `GET /compare?city1=城市1&city2=城市2` - 城市对比
+- `GET /stats?city=城市名` - 统计数据
+- `POST /ai/analyze` - AI智能分析
 
-- ✅ **智能检测**: 自动检查Python、PostgreSQL、依赖包状态
-- ✅ **执行策略**: 自动处理PowerShell执行策略限制
-- ✅ **服务管理**: 自动检测和启动PostgreSQL服务  
-- ✅ **多窗口启动**: 前后端自动在新窗口中启动
-- ✅ **错误处理**: 详细的错误提示和解决方案
-- ✅ **用户界面**: 彩色输出和友好的交互体验
+#### 用户管理接口
+- `POST /auth/register` - 用户注册
+- `POST /auth/login` - 用户登录
+- `GET /auth/me` - 获取当前用户信息
+- `GET /auth/users` - 获取用户列表
 
-### 🐘 PostgreSQL数据库配置
+### 数据库
+- 使用SQLite本地数据库
+- 自动创建表结构
+- 支持用户数据和日志存储
+- 数据库文件：`backend/housing_price.db`
 
-#### 自动配置（推荐）
-```powershell
-.\setup_postgresql.ps1
+## 🎯 使用示例
+
+### 用户注册
+```bash
+curl -X POST "http://localhost:8000/auth/register" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "username": "newuser",
+    "email": "user@example.com",
+    "password": "password123",
+    "full_name": "新用户"
+  }'
 ```
 
-#### 手动配置
-1. **安装PostgreSQL**: 访问 https://www.postgresql.org/download/windows/
-2. **配置数据库**: `python init_database.py`
-
-**数据库配置信息**:
-- 数据库名: Housing_Price_postgres
-- 用户名: Housing_Price_postgres  
-- 密码: 123456
-- 主机: localhost
-- 端口: 5432
-
-### 🌐 访问系统
-
-安装完成后，在浏览器中访问：
-
-| 服务 | 地址 | 用途 |
-|-----|------|------|
-| **前端应用** | http://localhost:8501 | 🎨 主要用户界面 |
-| **后端API** | http://localhost:8000 | 🔧 RESTful API服务 |
-| **API文档** | http://localhost:8000/docs | 📚 交互式API文档 |
-
-### ❗ Windows常见问题解决
-
-#### PowerShell执行策略问题
-**问题**: 提示"无法加载文件，因为在此系统上禁止运行脚本"
-
-**解决方案**:
-```powershell
-Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope Process
+### 房价查询
+```bash
+curl "http://localhost:8000/search?city=深圳"
 ```
 
-#### Python未找到错误
-**问题**: 提示"'python' 不是内部或外部命令"
+### AI分析
+```bash
+curl -X POST "http://localhost:8000/ai/analyze" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "query": "深圳的房价趋势如何？",
+    "city": "深圳"
+  }'
+```
 
-**解决方案**:
-1. 从 https://python.org 下载安装Python
-2. 安装时务必勾选"Add to PATH"选项
-3. 重启命令提示符窗口
-4. 验证安装: `python --version`
+## 🐛 问题排查
 
-#### 端口被占用
-**问题**: 提示端口8000或8501已被占用
-
-**解决方案**:
-```cmd
-# 查看端口占用
+### 端口被占用
+```bash
+# 检查端口占用
 netstat -ano | findstr :8000
 netstat -ano | findstr :8501
 
-# 结束占用进程（替换<PID>为实际进程ID）
-taskkill /PID <PID> /F
+# 终止进程
+taskkill /f /pid <进程ID>
 ```
 
-#### PostgreSQL连接失败
-**问题**: 数据库连接失败或用户管理功能不可用
-
-**解决方案**:
-```cmd
-# 1. 检查PostgreSQL服务
-sc query postgresql-x64-13
-
-# 2. 启动PostgreSQL服务
-net start postgresql-x64-13
-
-# 3. 重新配置数据库
-.\setup_postgresql.ps1
-```
-
-#### 依赖安装失败
-**问题**: pip安装依赖时出错
-
-**解决方案**:
-```cmd
+### 依赖安装失败
+```bash
 # 升级pip
 python -m pip install --upgrade pip
 
-# 使用国内镜像源
-pip install -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
+# 重新安装依赖
+pip install -r requirements.txt --force-reinstall
 ```
 
-### 🔄 更新和维护
+### 数据库问题
+- 如果数据库文件损坏，删除 `backend/housing_price.db` 后重启系统
+- 系统会自动重新创建数据库和表结构
 
-```cmd
-# 更新数据
-cd scraper
-scrapy crawl housing_spider
-
-# 重置数据库
-python init_database.py
-
-# 清除缓存（在应用界面中点击"刷新页面缓存"按钮）
-```
+## 🚀 部署说明
 
-### ⏹️ 停止系统
-
-**正常停止**: 在运行脚本的命令行窗口中按 `Ctrl + C`
-
-**强制停止**:
-```cmd
-taskkill /IM python.exe /F
-taskkill /IM uvicorn.exe /F
-```
+### 本地开发
+1. 克隆项目到本地
+2. 安装Python依赖：`pip install -r requirements.txt`
+3. 运行启动脚本：`start.bat`
 
-### 🎉 成功标志
+### 生产部署
+1. 配置环境变量
+2. 使用 Gunicorn 或 Uvicorn 部署后端
+3. 配置反向代理 (Nginx)
+4. 设置HTTPS证书
 
-当看到以下内容时，说明系统启动成功：
+## 🛠️ 开发计划
 
-**后端启动成功**:
-```
-INFO:     Uvicorn running on http://127.0.0.1:8000 (Press CTRL+C to quit)
-INFO:     Started reloader process
-```
+- [ ] 添加更多城市数据
+- [ ] 实现房价预测模型
+- [ ] 优化AI分析算法
+- [ ] 添加邮件通知功能
+- [ ] 实现数据导出功能
+- [ ] 移动端适配
 
-**前端启动成功**:
-```
-You can now view your Streamlit app in your browser.
-Local URL: http://localhost:8501
-```
+## 📄 许可证
 
-浏览器会自动打开，显示房价分析系统主页。
+MIT License
 
-## 🔐 用户管理功能
+## 📋 项目历程
 
-### 功能特性
-- ✅ 用户注册/登录
-- ✅ JWT Token认证
-- ✅ 密码安全加密
-- ✅ 用户权限管理
-- ✅ 活动日志记录
-- ✅ 管理员功能
+### 问题解决过程
+本项目最初设计使用PostgreSQL数据库，但在Windows环境下遇到了字符编码问题。经过多次尝试修复PostgreSQL的编码配置后，最终采用SQLite作为主要数据库解决方案，不仅解决了编码问题，还简化了部署流程。
 
-### 数据库配置
-- **数据库名**: Housing_Price_postgres
-- **用户名**: Housing_Price_postgres
-- **密码**: 123456
-- **表结构**: users, user_tokens, user_activity_logs
+### 技术选型对比
 
-### 默认管理员账户
-初始化后可使用以下账户登录：
-- **用户名**: admin
-- **密码**: 123456
-- **邮箱**: 123456@example.com
+#### SQLite vs PostgreSQL
+| 特性 | SQLite | PostgreSQL |
+|------|--------|------------|
+| 安装复杂度 | ⭐⭐⭐⭐⭐ 无需安装 | ⭐⭐ 需要安装配置 |
+| 编码问题 | ⭐⭐⭐⭐⭐ 无编码问题 | ⭐ Windows环境编码复杂 |
+| 启动速度 | ⭐⭐⭐⭐⭐ 即时启动 | ⭐⭐⭐ 需要服务启动 |
+| 资源占用 | ⭐⭐⭐⭐⭐ 极低 | ⭐⭐⭐ 中等 |
+| 并发支持 | ⭐⭐⭐ 有限 | ⭐⭐⭐⭐⭐ 优秀 |
+| 数据完整性 | ⭐⭐⭐⭐ 良好 | ⭐⭐⭐⭐⭐ 企业级 |
 
-### API接口
-- `POST /auth/register` - 用户注册
-- `POST /auth/login` - 用户登录
-- `GET /auth/me` - 获取用户信息
-- `GET /auth/users` - 用户列表（需登录）
-- `POST /auth/logout` - 用户登出
+### 已验证功能
+- ✅ 用户注册/登录系统
+- ✅ JWT令牌认证机制
+- ✅ 房价数据查询分析
+- ✅ AI智能分析助手
+- ✅ 数据可视化图表
+- ✅ 多城市对比功能
 
-### 安全特性
-- SHA256密码哈希加密
-- JWT Token 7天有效期
-- SQL注入防护和输入验证
-- 用户活动日志记录
+### 项目优势
+- **即开即用**: 无需复杂的数据库配置
+- **跨平台**: 支持Windows/Linux/macOS
+- **轻量级**: 资源占用极低
+- **稳定可靠**: 经过全面测试验证
+- **易于部署**: 单文件数据库，便于迁移
 
-## 🧪 功能测试
+## 🤝 贡献指南
 
-```bash
-# 测试用户管理功能
-python3 test_user_management.py
+欢迎提交 Issue 和 Pull Request！
 
-# 测试基础API
-curl http://localhost:8000/
-curl http://localhost:8000/cities
-```
+1. Fork 项目
+2. 创建特性分支 (`git checkout -b feature/AmazingFeature`)
+3. 提交更改 (`git commit -m 'Add some AmazingFeature'`)
+4. 推送到分支 (`git push origin feature/AmazingFeature`)
+5. 开启 Pull Request
 
-## 运行方式 (Windows 用户指南)
+## 📞 联系方式
 
-本指南将引导您在 Windows 系统上通过 PowerShell 终端运行此项目。
+如有问题，请通过 GitHub Issues 联系。
 
-### 1. 环境准备
+---
 
-在项目根目录打开 PowerShell 终端，然后执行以下步骤：
-
-1.  **创建虚拟环境**:
-    ```powershell
-    python -m venv .venv
-    ```
-
-2.  **激活虚拟环境**:
-    ```powershell
-    .\.venv\Scripts\activate
-    ```
-    > **PowerShell 错误处理**: 如果激活失败并提示“禁止运行脚本”，请先运行以下命令，然后重试激活。此命令仅为当前终端会话更改执行策略，是安全的操作。
-    > ```powershell
-    > Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope Process
-    > ```
-    成功激活后，您的终端提示符前应显示 `(.venv)`。
-
-### 2. 安装依赖
-
-确保您的虚拟环境已经激活，然后运行：
-```powershell
-pip install -r requirements.txt
-```
-
-### 3. 数据库初始化（用户管理功能）
-
-如果需要使用用户管理功能，请先初始化数据库：
-
-```powershell
-# 运行数据库初始化脚本
-python init_database.py
-```
-
-脚本将自动：
-- 创建数据库和用户
-- 初始化表结构
-- 可选择创建管理员账户
-
-> **注意**：如果跳过此步骤，系统仍可正常运行基础的房价分析功能，但用户管理功能将不可用。
-
-### 4. 启动应用 (需要两个终端)
-
-本项目的前后端需要分别启动。请打开 **两个** PowerShell 终端，并在 **每个终端中都激活虚拟环境** (`.\.venv\Scripts\activate`)。
-
--   **终端 1: 启动后端服务**
-    ```powershell
-    uvicorn backend.main:app --reload --port 8000
-    ```
-    *服务将在 `http://127.0.0.1:8000` 上可用。让此终端保持运行。*
-
--   **终端 2: 启动前端应用**
-    ```powershell
-    streamlit run frontend/app.py
-    ```
-    *应用将在浏览器中自动打开。*
-
-### 4. 更新数据 (可选)
-
-如果需要重新抓取或更新数据，请打开一个新的、已激活虚拟环境的终端，然后运行：
-```powershell
-cd scraper
-scrapy crawl housing_spider
-cd ..
-```
-
-### 5. 停止应用
-
-当您想停止应用时，请在两个运行服务的终端中分别按下 `Ctrl+C`，或直接点击终端窗口旁的“垃圾桶”图标关闭它们。
-
-## 运行方式 (Linux & macOS 用户指南)
-
-本指南将引导您在 Linux 或 macOS 系统上通过终端运行此项目。
-
-### 1. 环境准备
-
-在项目根目录打开终端，然后执行以下步骤：
-
-1.  **创建虚拟环境**:
-    ```bash
-    python3 -m venv .venv
-    ```
-
-2.  **激活虚拟环境**:
-    ```bash
-    source .venv/bin/activate
-    ```
-    *成功激活后，您的终端提示符前应显示 `(.venv)`。*
-
-3.  **安装PostgreSQL数据库**（用户管理功能需要）:
-    ```bash
-    # Ubuntu/Debian
-    sudo apt update
-    sudo apt install postgresql postgresql-contrib
-    
-    # CentOS/RHEL
-    sudo yum install postgresql postgresql-server
-    
-    # macOS (使用Homebrew)
-    brew install postgresql
-    ```
-
-### 2. 安装依赖
-
-确保您的虚拟环境已经激活，然后运行：
-```bash
-pip install -r requirements.txt
-```
-
-### 3. 数据库初始化（用户管理功能）
-
-如果需要使用用户管理功能，请先初始化数据库：
-
-```bash
-# 运行数据库初始化脚本
-python3 init_database.py
-```
-
-脚本将自动：
-- 创建数据库和用户
-- 初始化表结构
-- 可选择创建管理员账户
-
-> **注意**：如果跳过此步骤，系统仍可正常运行基础的房价分析功能，但用户管理功能将不可用。
-
-### 4. 启动应用 (需要两个终端)
-
-请打开 **两个** 终端窗口，并在 **每个窗口中都激活虚拟环境** (`source .venv/bin/activate`)。
-
--   **终端 1: 启动后端服务**
-    ```bash
-    uvicorn backend.main:app --reload --port 8000
-    ```
-
--   **终端 2: 启动前端应用**
-    ```bash
-    streamlit run frontend/app.py
-    ```
-
-### 4. 更新数据 (可选)
-
-如果需要重新抓取或更新数据，请打开一个新的、已激活虚拟环境的终端，然后运行：
-```bash
-cd scraper
-scrapy crawl housing_spider
-cd ..
-```
-
-### 5. 停止应用
-
-在每个运行服务的终端中按下 `Ctrl+C` 即可停止应用。
-
-## 故障排除
-
-### 页面显示异常问题
-如果前端页面出现布局混乱、样式错误或显示异常，请尝试以下解决方案：
-
-1. **浏览器强制刷新** (推荐)：
-   - Windows/Linux: `Ctrl + Shift + R`
-   - macOS: `Cmd + Shift + R`
-
-2. **应用内缓存清理**：
-   - 点击左侧边栏的 "🔄 刷新页面缓存" 按钮
-   - 在主页点击 "🧹 清除所有缓存" 按钮
-
-3. **彻底清除缓存**：
-   ```bash
-   # 停止前端应用 (Ctrl+C)
-   # 清除Streamlit缓存目录
-   rm -rf ~/.streamlit/cache
-   # 重新启动前端
-   streamlit run frontend/app.py
-   ```
-
-4. **浏览器缓存清理**：
-   - 清除浏览器缓存和Cookie
-   - 使用无痕/隐私模式重新打开
-
-### 后端连接问题
-- 确保后端服务在端口8000上正常运行
-- 检查防火墙设置
-- 验证后端URL配置 (`http://127.0.0.1:8000`)
-
-### 用户管理问题
-
-#### PostgreSQL连接失败
-如果遇到数据库连接问题：
-
-1. **检查PostgreSQL服务状态**：
-   ```bash
-   sudo systemctl status postgresql
-   ```
-
-2. **重置postgres用户密码**：
-   ```bash
-   sudo -u postgres psql -c "ALTER USER postgres PASSWORD '123456';"
-   ```
-
-3. **运行PostgreSQL设置脚本**：
-   ```bash
-   ./setup_postgresql.sh
-   ```
-
-4. **手动创建数据库**：
-   ```bash
-   sudo -u postgres createuser Housing_Price_postgres
-   sudo -u postgres createdb Housing_Price_postgres -O Housing_Price_postgres
-   sudo -u postgres psql -c "ALTER USER Housing_Price_postgres PASSWORD '123456';"
-   ```
-
-#### 用户注册/登录问题
-- 检查后端服务是否正常运行
-- 确认数据库表已正确创建
-- 验证网络连接和API响应
-
-#### 测试功能
-运行测试脚本验证功能：
-```bash
-python3 test_user_management.py
-```
-
-## API 接口
-
-后端服务提供以下主要接口：
-
-### 核心数据接口
-- `GET /search`: 根据城市名称搜索房价数据
-- `GET /trend`: 获取指定城市和区域的房价走势数据
-- `GET /city_all_trends`: 获取指定城市所有区域的房价走势数据
-- `GET /compare`: 获取用于城市房价对比的数据
-- `GET /areas`: 根据城市名称获取其下属的区域列表
-- `GET /cities`: 获取所有可用的城市列表
-- `GET /stats`: 获取指定城市的房价统计数据
-
-### AI智能分析接口
-- `POST /ai/analyze`: AI智能分析接口，支持自然语言查询
-- `GET /ai/suggestions`: 获取AI建议的问题列表
-
-### 用户认证接口
-- `POST /auth/register`: 用户注册
-- `POST /auth/login`: 用户登录
-- `GET /auth/me`: 获取当前用户信息（需认证）
-- `GET /auth/users`: 获取用户列表（需认证）
-- `POST /auth/logout`: 用户登出（需认证）
-- `GET /protected/search`: 受保护的房价搜索（需认证）
-- `GET /protected/trend`: 受保护的趋势分析（需认证）
-
-### 系统接口
-- `GET /`: 系统欢迎信息
-
-## 更新日志
-
-### 2025-06-29 用户管理系统完成部署 (v3.0) ✅
-- **🎉 系统状态**：全功能用户管理系统部署完成并测试通过
-- **👥 用户管理核心功能**：
-  - 用户注册/登录系统（✅ 测试通过）
-  - JWT Token安全认证（✅ 测试通过）
-  - PostgreSQL数据库集成（✅ 测试通过）
-  - 用户权限和活动日志（✅ 测试通过）
-- **🔧 部署工具**：
-  - `init_database.py` - 数据库一键初始化
-  - `setup_postgresql.sh` - PostgreSQL快速设置
-  - `start_system.sh` - 系统一键启动
-  - `test_user_management.py` - 功能完整性测试
-- **📊 数据库配置**：
-  - 数据库：Housing_Price_postgres
-  - 用户：Housing_Price_postgres  
-  - 密码：123456
-  - 表结构：users, user_tokens, user_activity_logs
-- **🎨 前端更新**：
-  - 动态导航栏（登录状态自适应）
-  - 用户注册/登录界面
-  - 个人信息管理页面
-  - 用户列表管理功能
-- **🔐 安全特性**：
-  - SHA256密码哈希加密
-  - 7天Token有效期
-  - SQL注入防护
-  - 输入数据验证
-- **📈 测试结果**：
-  - ✅ 所有基础API测试通过
-  - ✅ 用户注册功能测试通过  
-  - ✅ 用户登录功能测试通过
-  - ✅ 受保护端点测试通过
-  - ✅ 前后端集成测试通过
-
-### 2025-06-29 用户管理功能开发 (v3.0)
-- **👥 新增用户管理系统**：
-  - 完整的用户注册、登录、身份验证功能
-  - PostgreSQL数据库存储用户信息
-  - JWT Token安全认证机制
-  - 用户活动日志记录
-- **🔐 安全功能**：
-  - SHA256密码哈希加密
-  - 密码强度验证
-  - 令牌自动过期管理
-  - 用户权限控制
-- **🎨 前端用户界面**：
-  - 动态导航栏（登录状态自适应）
-  - 用户注册/登录页面
-  - 个人信息管理界面
-  - 用户列表管理功能
-- **🛠️ 开发工具**：
-  - 数据库初始化脚本 (init_database.py)
-  - 功能测试脚本 (test_user_management.py)
-  - 一键启动脚本 (start_system.sh)
-  - 详细的用户管理指南文档
-- **📊 数据库设计**：
-  - users表：存储用户基本信息
-  - user_tokens表：管理认证令牌
-  - user_activity_logs表：记录用户活动
-- **🔧 API接口扩展**：
-  - `/auth/register` - 用户注册
-  - `/auth/login` - 用户登录
-  - `/auth/me` - 获取当前用户信息
-  - `/auth/users` - 用户列表管理
-  - `/protected/*` - 受保护的分析接口示例
-
-### 2025-06-28 趋势分析功能扩展 (v2.1)
-- **🏙️ 新增城市全景分析模式**：
-  - 一键查看城市所有区域房价趋势对比图
-  - 多线趋势图显示所有区域的房价变化轨迹
-  - 区域统计对比表格，包含当前价格、均价、最高/低价、变化率
-  - 房价排名和涨幅排名展示（前三名奖牌样式）
-- **🔧 后端API扩展**：
-  - 新增 `/city_all_trends` 接口获取城市所有区域趋势数据
-  - 完善错误处理和数据验证机制
-  - 增强API稳定性和响应速度
-- **🎨 前端交互优化**：
-  - 添加分析模式选择（单个区域分析/城市全景分析）
-  - 优化单个区域分析，增加统计指标卡片展示
-  - 改进数据可视化，支持多线趋势图和排名展示
-  - 增强用户体验和错误提示机制
-- **🛠️ 页面显示问题修复**：
-  - 解决前端页面混乱和缓存问题
-  - 添加CSS缓存破坏机制和智能版本控制
-  - 新增页面缓存清理工具和故障排除指南
-  - 完善系统状态监控和用户友好的解决方案
-
-### 2025-06-28 项目完成版本 (v2.0)
-- **🎉 项目里程碑**: 房价分析系统升级完成，正式发布v2.0版本
-- **📊 数据规模扩展**: 
-  - 从146条记录扩展到1080条记录（增长642%）
-  - 覆盖6个主要城市：北京、上海、深圳、广州、杭州、重庆
-  - 时间跨度：2023年1月至2025年6月（30个月历史数据）
-  - 每城市6个区域，价格范围真实合理
-- **🤖 AI助手功能**: 新增智能AI助手页面，提供以下功能：
-  - 智能数据解读：基于房价数据自动生成分析洞察
-  - 趋势预测分析：智能分析房价走势和变化趋势  
-  - 投资建议：根据数据特征提供个性化投资参考
-  - 自然语言查询：支持用自然语言询问房价相关问题
-  - 智能问题推荐：根据选择城市动态生成建议问题
-- **🔧 后端API扩展**: 
-  - 新增 `/ai/analyze` POST接口处理AI分析请求
-  - 新增 `/ai/suggestions` GET接口提供建议问题
-  - 新增 `/cities` GET接口动态获取城市列表
-  - 实现趋势分析、投资建议、市场洞察等AI算法
-  - 完善错误处理和类型安全机制
-- **🎨 前端交互优化**: 
-  - 添加AI助手页面到导航栏，使用机器人图标
-  - 设计智能对话界面，支持建议问题一键提问
-  - 实现AI分析结果可视化展示
-  - 城市和区域选择器动态从后端加载
-- **💄 样式美化**: 添加AI助手专用CSS样式，包括渐变背景、悬停效果、脉冲动画等
-- **📚 文档完善**: 
-  - 生成详细的升级报告（UPGRADE_REPORT.md）
-  - 创建PR合并指南（PR_GUIDE.md）
-  - 更新API文档和用户指南
-- **🔄 版本管理**: 
-  - 创建feature/ai-assistant-and-data-expansion功能分支
-  - 完成所有功能开发和测试
-  - 成功合并到主分支（Fast-forward合并）
-  - 推送到GitHub远程仓库
-- **✅ 质量保证**: 
-  - 完整的功能测试和集成测试
-  - API响应时间优化至200ms以内
-  - 内存使用优化，支持大数据量处理
-  - 生产环境就绪状态
-
-### 2025-06-27
-- **爬虫重构**: 使用 `Scrapy` 框架完全重构了数据爬虫，替代了原有的 `BeautifulSoup` 脚本。
-  - 新的爬虫项目位于 `scraper/housing_spider/`，结构更清晰、功能更强大。
-  - 实现了与原脚本相同的去重和数据更新逻辑。
-- **项目依赖更新**: 在 `requirements.txt` 中添加了 `scrapy`。
-- **文档同步**: 更新了 `README.md` 中的技术栈、目录结构和运行说明。
-
-### 2025-06-26
-- 新增 requirements.txt 文件，统一管理项目依赖。
-  - 依赖包括 fastapi、uvicorn、psycopg2-binary、pandas、requests、plotly、streamlit、streamlit-option-menu。
-- 推荐使用 pip install -r requirements.txt 一键安装所有依赖。
-- 优化了依赖管理，便于环境复现和部署。
+⭐ 如果这个项目对您有帮助，请给个Star支持一下！

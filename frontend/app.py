@@ -206,11 +206,19 @@ else:
         )
     with col2:
         # 登录/注册按钮
-        auth_option = st.selectbox("", ["登录", "注册"], label_visibility="collapsed")
-        if auth_option == "登录":
-            page = "登录"
-        else:
-            page = "注册"
+        auth_option = st.selectbox("用户操作", ["登录", "注册"], label_visibility="collapsed")
+        if st.button("🔑 " + auth_option):
+            # 只有当点击按钮时才切换到登录/注册页面
+            st.session_state.show_auth = True
+            st.session_state.auth_mode = auth_option.lower()
+            st.rerun()
+
+# 处理登录/注册界面
+if hasattr(st.session_state, 'show_auth') and st.session_state.show_auth:
+    if st.session_state.auth_mode == "登录":
+        page = "登录"
+    else:
+        page = "注册"
 
 # --- 主页 ---
 if page == "主页":
@@ -248,8 +256,32 @@ if page == "主页":
             st.error(f"❌ 无法连接后端服务: {str(e)}")
     
     with col2:
-        st.subheader("🛠️ 故障排除")
+        st.subheader("� 系统说明")
         st.markdown("""
+        **✅ 可用功能:**
+        - 房价查询、趋势分析
+        - 城市对比、数据洞察  
+        - AI智能助手
+        
+        **⚠️ 用户管理状态:**
+        """)
+        
+        # 检查用户管理功能状态
+        try:
+            # 尝试访问一个需要数据库的API来检查状态
+            test_response = requests.get(f"{BACKEND_URL}/auth/users", timeout=3)
+            if test_response.status_code == 500:
+                st.warning("数据库连接失败，用户管理功能暂不可用")
+            else:
+                st.info("用户管理功能正常")
+        except:
+            st.warning("数据库连接失败，用户管理功能暂不可用")
+            
+        st.markdown("""
+        **📋 使用提示:**
+        - 所有核心分析功能无需登录即可使用
+        - 如需使用用户管理功能，请配置PostgreSQL数据库
+        
         **如果遇到页面显示问题：**
         1. 点击左侧 "🔄 刷新页面缓存" 按钮
         2. 使用 Ctrl+Shift+R 强制刷新浏览器
@@ -727,6 +759,11 @@ if page == "AI助手":
 
 # --- 登录页面 ---
 elif page == "登录":
+    # 添加返回按钮
+    if st.button("← 返回主页"):
+        st.session_state.show_auth = False
+        st.rerun()
+    
     st.title("🔐 用户登录")
     
     with st.form("login_form"):
@@ -741,6 +778,7 @@ elif page == "登录":
                 success, message = login_user(username, password)
                 if success:
                     st.success(message)
+                    st.session_state.show_auth = False  # 登录成功后隐藏认证界面
                     st.rerun()
                 else:
                     st.error(message)
@@ -748,10 +786,15 @@ elif page == "登录":
                 st.warning("请填写所有字段")
     
     st.markdown("---")
-    st.info("没有账号？请选择右上角的'注册'选项")
+    st.info("没有账号？请点击右上角的'注册'选项")
 
 # --- 注册页面 ---
 elif page == "注册":
+    # 添加返回按钮
+    if st.button("← 返回主页"):
+        st.session_state.show_auth = False
+        st.rerun()
+    
     st.title("📝 用户注册")
     
     with st.form("register_form"):
@@ -774,7 +817,9 @@ elif page == "注册":
                     success, message = register_user(username, email, password, full_name if full_name else None)
                     if success:
                         st.success(message)
-                        st.info("注册成功！请选择右上角的'登录'选项登录")
+                        st.info("注册成功！您可以返回主页或切换到登录")
+                        st.session_state.show_auth = False  # 注册成功后隐藏认证界面
+                        st.rerun()
                     else:
                         st.error(message)
             else:

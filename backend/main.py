@@ -9,20 +9,71 @@ import os
 import json
 from typing import Optional
 
-# 导入用户管理相关模块
-try:
-    from backend.database import init_connection_pool, create_tables, UserManager, log_user_activity
-    from backend.auth import (
-        UserRegister, UserLogin, LoginResponse, UserResponse,
-        validate_username, validate_password, get_current_user, get_optional_user
-    )
-except ImportError:
-    # 备用导入方式
-    from database import init_connection_pool, create_tables, UserManager, log_user_activity
-    from auth import (
-        UserRegister, UserLogin, LoginResponse, UserResponse,
-        validate_username, validate_password, get_current_user, get_optional_user
-    )
+# 导入数据库模块（使用SQLite）
+from backend.database import init_sqlite_database, SQLiteUserManager, log_sqlite_user_activity
+UserManager = SQLiteUserManager
+log_user_activity = log_sqlite_user_activity
+DB_TYPE = "sqlite"
+
+# Auth相关模型和函数
+from pydantic import BaseModel, EmailStr
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+import re
+
+security = HTTPBearer()
+
+class UserRegister(BaseModel):
+    username: str
+    email: EmailStr
+    password: str
+    full_name: Optional[str] = None
+
+class UserLogin(BaseModel):
+    username: str  # 可以是用户名或邮箱
+    password: str
+
+class UserResponse(BaseModel):
+    id: int
+    username: str
+    email: str
+    full_name: Optional[str] = None
+    created_at: str
+    last_login: Optional[str] = None
+
+class LoginResponse(BaseModel):
+    message: str
+    user: UserResponse
+    token: str
+    expires_at: str
+
+def validate_username(username: str) -> bool:
+    """验证用户名格式"""
+    if not username or len(username) < 3 or len(username) > 50:
+        return False
+    return bool(re.match(r'^[a-zA-Z0-9_]+$', username))
+
+def validate_password(password: str) -> bool:
+    """验证密码强度"""
+    if not password or len(password) < 6:
+        return False
+    return True
+
+def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)):
+    """获取当前登录用户"""
+    token = credentials.credentials
+    result = UserManager.verify_token(token)
+    if not result.get("success"):
+        raise HTTPException(status_code=401, detail="Invalid token")
+    return result["user"]
+
+def get_optional_user(credentials: Optional[HTTPAuthorizationCredentials] = Depends(security)):
+    """可选的用户认证（允许匿名访问）"""
+    if not credentials:
+        return None
+    try:
+        return get_current_user(credentials)
+    except HTTPException:
+        return None
 
 app = FastAPI(title="房价分析系统后端API")
 
@@ -39,13 +90,15 @@ app.add_middleware(
 @app.on_event("startup")
 async def startup_event():
     """应用启动时初始化数据库"""
-    print("正在初始化数据库连接...")
-    if init_connection_pool():
-        print("正在创建数据库表...")
-        create_tables()
-        print("数据库初始化完成")
-    else:
-        print("警告: 数据库连接失败，用户管理功能将不可用")
+    print("正在初始化SQLite数据库...")
+    try:
+        if init_sqlite_database():
+            print("SQLite数据库初始化完成")
+        else:
+            print("SQLite数据库初始化失败")
+    except Exception as e:
+        print(f"数据库初始化失败: {e}")
+        print("系统将以基础模式运行，用户管理功能可能不可用")
 
 # 数据加载
 DATA_PATH = os.path.join(os.path.dirname(__file__), '..', 'data', 'housing_data.csv')
