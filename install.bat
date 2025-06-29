@@ -1,4 +1,5 @@
 @echo off
+setlocal EnableDelayedExpansion
 chcp 65001 >nul
 title 房价分析系统 - Windows一键安装
 
@@ -35,11 +36,11 @@ echo.
 echo 本程序将为您自动完成以下操作：
 echo   ✓ 检查并安装Python依赖
 echo   ✓ 创建虚拟环境  
-echo   ✓ 配置数据库（可选）
+echo   ✓ 配置数据库^(可选^)
 echo   ✓ 启动应用系统
 echo.
 
-set /p confirm=是否继续安装？ (Y/N): 
+set /p confirm=是否继续安装？ ^(Y/N^): 
 if /i not "%confirm%"=="Y" (
     echo 👋 安装已取消
     pause
@@ -124,11 +125,11 @@ echo.
 echo 🔐 用户管理功能需要PostgreSQL数据库支持
 echo.
 echo 选择操作：
-echo   1. 配置PostgreSQL（推荐，支持完整功能）
-echo   2. 跳过数据库配置（仅基础功能）
+echo   1. 配置PostgreSQL^(推荐，支持完整功能^)
+echo   2. 跳过数据库配置^(仅基础功能^)
 echo.
 
-set /p db_choice=请选择 (1-2): 
+set /p db_choice=请选择 ^(1-2^): 
 
 if "%db_choice%"=="1" (
     echo.
@@ -145,7 +146,7 @@ if "%db_choice%"=="1" (
         echo    3. 记住postgres用户密码
         echo    4. 重新运行此脚本
         echo.
-        set /p skip_db=是否跳过数据库配置继续安装？ (Y/N): 
+        set /p skip_db=是否跳过数据库配置继续安装？ ^(Y/N^): 
         if /i "!skip_db!"=="Y" (
             echo ⏭️  跳过数据库配置
         ) else (
@@ -156,8 +157,10 @@ if "%db_choice%"=="1" (
         echo ✅ PostgreSQL已安装
         echo 🔧 运行数据库配置脚本...
         
-        if exist "setup_postgresql.ps1" (
-            powershell -ExecutionPolicy Bypass -File setup_postgresql.ps1
+        if exist "setup_postgresql_simple.ps1" (
+            powershell -ExecutionPolicy Bypass -Command "& {Set-ExecutionPolicy Bypass -Scope Process; .\setup_postgresql_simple.ps1}"
+        ) else if exist "setup_postgresql.ps1" (
+            powershell -ExecutionPolicy Bypass -Command "& {Set-ExecutionPolicy Bypass -Scope Process; .\setup_postgresql.ps1}"
         ) else (
             echo 🔧 手动配置数据库...
             python init_database.py
@@ -187,7 +190,7 @@ if "%db_choice%"=="1" (
 )
 echo.
 echo 🚀 现在启动系统？
-set /p start_now=立即启动应用 (Y/N): 
+set /p start_now=立即启动应用 ^(Y/N^): 
 
 if /i "%start_now%"=="Y" (
     echo.

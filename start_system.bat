@@ -1,4 +1,5 @@
 @echo off
+setlocal EnableDelayedExpansion
 chcp 65001 >nul
 title 房价分析系统启动器
 
@@ -11,7 +12,7 @@ REM 检查Python是否安装
 echo 检查Python环境...
 python --version >nul 2>&1
 if %errorlevel% neq 0 (
-    echo ❌ Python未安装，请先安装Python 3.8+
+    echo ❌ Python未安装请先安装Python 3.8+
     pause
     exit /b 1
 )
@@ -60,7 +61,7 @@ if %errorlevel% neq 0 (
 
 REM 检查数据库连接
 echo 检查数据库连接...
-python -c "import psycopg2; conn = psycopg2.connect('postgresql://Housing_Price_postgres:123456@localhost/Housing_Price_postgres'); conn.close(); print('connected')" >nul 2>&1
+python -c "import psycopg2; psycopg2.connect('postgresql://Housing_Price_postgres:123456@localhost/Housing_Price_postgres').close()" >nul 2>&1
 if %errorlevel% eq 0 (
     echo ✅ 数据库连接正常
 ) else (
@@ -80,7 +81,7 @@ echo 3. 仅启动前端 - 需要后端已在运行
 echo 4. 退出
 echo.
 
-set /p choice=请输入选择 (1-4): 
+set /p choice=请输入选择 ^(1-4^): 
 
 if "%choice%"=="1" goto start_both
 if "%choice%"=="2" goto start_backend
@@ -96,7 +97,7 @@ echo.
 echo 启动后端服务...
 
 REM 启动后端 - 在新窗口中
-start "房价分析系统 - 后端服务" cmd /k "call .venv\Scripts\activate.bat && echo 🔧 后端服务启动中... && echo 访问地址: http://localhost:8000 && echo API文档: http://localhost:8000/docs && echo. && uvicorn backend.main:app --reload --port 8000"
+start "房价分析系统 - 后端服务" cmd /k "call .venv\Scripts\activate.bat && echo Backend starting... && echo Access: http://localhost:8000 && echo API Docs: http://localhost:8000/docs && uvicorn backend.main:app --reload --port 8000"
 
 REM 等待后端启动
 echo 等待后端启动...
@@ -105,7 +106,7 @@ timeout /t 3 /nobreak >nul
 echo 启动前端应用...
 
 REM 启动前端 - 在新窗口中  
-start "房价分析系统 - 前端应用" cmd /k "call .venv\Scripts\activate.bat && echo 🎨 前端应用启动中... && echo 应用将在浏览器中自动打开 && echo 访问地址: http://localhost:8501 && echo. && streamlit run frontend/app.py"
+start "房价分析系统 - 前端应用" cmd /k "call .venv\Scripts\activate.bat && echo Frontend starting... && echo Access: http://localhost:8501 && streamlit run frontend/app.py"
 
 echo.
 echo ✅ 系统启动完成!
