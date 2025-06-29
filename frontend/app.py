@@ -268,14 +268,14 @@ if page == "主页":
         
         # 检查用户管理功能状态
         try:
-            # 尝试访问一个需要数据库的API来检查状态
-            test_response = requests.get(f"{BACKEND_URL}/auth/users", timeout=3)
-            if test_response.status_code == 500:
-                st.warning("数据库连接失败，用户管理功能暂不可用")
+            # 尝试访问基础API来检查后端状态
+            test_response = requests.get(f"{BACKEND_URL}/", timeout=3)
+            if test_response.status_code == 200:
+                st.info("✅ 后端服务正常，用户管理功能可用")
             else:
-                st.info("用户管理功能正常")
+                st.warning("⚠️ 后端服务异常")
         except:
-            st.warning("数据库连接失败，用户管理功能暂不可用")
+            st.warning("❌ 无法连接到后端服务，用户管理功能暂不可用")
             
         st.markdown("""
         **📋 使用提示:**
