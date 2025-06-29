@@ -1,214 +1,216 @@
 @echo off
 setlocal EnableDelayedExpansion
 chcp 65001 >nul
-title 房价分析系统 - Windows一键安装
+title Housing Price Analysis System - Windows Installer
 
+:: Clear screen and show header
+cls
 echo.
-echo    ██╗  ██╗ ██████╗ ██╗   ██╗███████╗██╗███╗   ██╗ ██████╗ 
-echo    ██║  ██║██╔═══██╗██║   ██║██╔════╝██║████╗  ██║██╔════╝ 
-echo    ███████║██║   ██║██║   ██║███████╗██║██╔██╗ ██║██║  ███╗
-echo    ██╔══██║██║   ██║██║   ██║╚════██║██║██║╚██╗██║██║   ██║
-echo    ██║  ██║╚██████╔╝╚██████╔╝███████║██║██║ ╚████║╚██████╔╝
-echo    ╚═╝  ╚═╝ ╚═════╝  ╚═════╝ ╚══════╝╚═╝╚═╝  ╚═══╝ ╚═════╝ 
+echo ================================================
+echo    Housing Price Analysis System v3.0
+echo    Windows One-Click Installer
+echo ================================================
 echo.
-echo    ██████╗ ██████╗ ██╗ ██████╗███████╗
-echo    ██╔══██╗██╔══██╗██║██╔════╝██╔════╝
-echo    ██████╔╝██████╔╝██║██║     █████╗  
-echo    ██╔═══╝ ██╔══██╗██║██║     ██╔══╝  
-echo    ██║     ██║  ██║██║╚██████╗███████╗
-echo    ╚═╝     ╚═╝  ╚═╝╚═╝ ╚═════╝╚══════╝
+echo.    ####    ####   #    #  ####  # #    #  ####
+echo.    #   #  #    #  #    #  #     # ##   # #    
+echo.    ####   #    #  #    #  ####  # # #  # #  ##
+echo.    #   #  #    #  #    #     #  # #  # # #   #
+echo.    #   #   ####    ####   ####  # #   ##  ####
 echo.
-echo         房价分析系统 v3.0 - Windows一键安装程序
-echo    ===================================================
+echo.    ####   ####   #  ####  ####
+echo.    #   #  #   #  #  #     #   
+echo.    ####   ####   #  #     #### 
+echo.    #      #   #  #  #     #   #
+echo.    #      #   #  #  ####  ####
+echo.
+echo ================================================
 echo.
 
-REM 检查是否在正确的目录
+:: Check if running in correct directory
 if not exist "requirements.txt" (
-    echo ❌ 错误：请在项目根目录下运行此脚本
-    echo    当前目录应包含 requirements.txt 文件
+    echo ERROR: Please run this script from the project root directory
+    echo        Current directory should contain requirements.txt file
     echo.
     pause
     exit /b 1
 )
 
-echo 🚀 欢迎使用房价分析系统！
+echo Welcome to Housing Price Analysis System!
 echo.
-echo 本程序将为您自动完成以下操作：
-echo   ✓ 检查并安装Python依赖
-echo   ✓ 创建虚拟环境  
-echo   ✓ 配置数据库^(可选^)
-echo   ✓ 启动应用系统
+echo This installer will automatically:
+echo   * Check and install Python dependencies
+echo   * Create virtual environment
+echo   * Configure database (optional)
+echo   * Launch application system
 echo.
 
-set /p confirm=是否继续安装？ ^(Y/N^): 
+set /p confirm="Continue with installation? (Y/N): "
 if /i not "%confirm%"=="Y" (
-    echo 👋 安装已取消
+    echo Installation cancelled by user
     pause
     exit /b 0
 )
 
 echo.
 echo ====================================================
-echo                   开始安装
+echo                Starting Installation
 echo ====================================================
 echo.
 
-REM 检查Python
-echo 🐍 检查Python环境...
+:: Check Python installation
+echo Checking Python environment...
 python --version >nul 2>&1
 if %errorlevel% neq 0 (
-    echo ❌ Python未安装
+    echo ERROR: Python not installed
     echo.
-    echo 📥 请先安装Python：
-    echo    1. 访问 https://python.org
-    echo    2. 下载Python 3.8或更高版本
-    echo    3. 安装时勾选"Add to PATH"
-    echo    4. 重新运行此脚本
+    echo Please install Python first:
+    echo    1. Visit https://python.org
+    echo    2. Download Python 3.8 or higher
+    echo    3. Check "Add to PATH" during installation
+    echo    4. Restart this script
     echo.
     pause
     exit /b 1
 )
 
 for /f "tokens=2" %%a in ('python --version 2^>^&1') do set python_version=%%a
-echo ✅ Python已安装: %python_version%
+echo SUCCESS: Python installed: %python_version%
 
-REM 创建虚拟环境
+:: Create virtual environment
 echo.
-echo 📦 设置虚拟环境...
+echo Setting up virtual environment...
 if exist ".venv" (
-    echo ✅ 虚拟环境已存在
+    echo SUCCESS: Virtual environment already exists
 ) else (
-    echo 🔧 创建虚拟环境...
+    echo Creating virtual environment...
     python -m venv .venv
     if %errorlevel% neq 0 (
-        echo ❌ 虚拟环境创建失败
+        echo ERROR: Failed to create virtual environment
         pause
         exit /b 1
     )
-    echo ✅ 虚拟环境创建成功
+    echo SUCCESS: Virtual environment created
 )
 
-REM 激活虚拟环境
-echo 🔌 激活虚拟环境...
+:: Activate virtual environment
+echo Activating virtual environment...
 call .venv\Scripts\activate.bat
 if %errorlevel% neq 0 (
-    echo ❌ 虚拟环境激活失败
+    echo ERROR: Failed to activate virtual environment
     pause
     exit /b 1
 )
-echo ✅ 虚拟环境已激活
+echo SUCCESS: Virtual environment activated
 
-REM 安装依赖
+:: Install dependencies
 echo.
-echo 📚 安装项目依赖...
-echo    这可能需要几分钟时间，请耐心等待...
+echo Installing project dependencies...
+echo    This may take a few minutes, please wait...
 pip install -r requirements.txt
 if %errorlevel% neq 0 (
-    echo ❌ 依赖安装失败
+    echo ERROR: Failed to install dependencies
     echo.
-    echo 💡 可能的解决方案：
-    echo    1. 检查网络连接
-    echo    2. 升级pip: python -m pip install --upgrade pip
-    echo    3. 使用国内镜像: pip install -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
+    echo Possible solutions:
+    echo    1. Check internet connection
+    echo    2. Upgrade pip: python -m pip install --upgrade pip
+    echo    3. Use mirror: pip install -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
     echo.
     pause
     exit /b 1
 )
-echo ✅ 依赖安装完成
+echo SUCCESS: Dependencies installed successfully
 
-REM 数据库配置选择
+:: Database configuration choice
 echo.
 echo ====================================================
-echo                  数据库配置
+echo                Database Configuration
 echo ====================================================
 echo.
-echo 🔐 用户管理功能需要PostgreSQL数据库支持
+echo User management features require PostgreSQL database support
 echo.
-echo 选择操作：
-echo   1. 配置PostgreSQL^(推荐，支持完整功能^)
-echo   2. 跳过数据库配置^(仅基础功能^)
+echo Choose an option:
+echo   1. Configure PostgreSQL (Recommended, full features)
+echo   2. Skip database configuration (Basic features only)
 echo.
 
-set /p db_choice=请选择 ^(1-2^): 
+set /p db_choice="Please choose (1-2): "
 
 if "%db_choice%"=="1" (
     echo.
-    echo 🐘 开始配置PostgreSQL...
+    echo Starting PostgreSQL configuration...
     
-    REM 检查PostgreSQL是否安装
+    :: Check if PostgreSQL is installed
     psql --version >nul 2>&1
     if %errorlevel% neq 0 (
-        echo ⚠️  PostgreSQL未检测到
+        echo WARNING: PostgreSQL not detected
         echo.
-        echo 📥 请安装PostgreSQL：
-        echo    1. 访问 https://www.postgresql.org/download/windows/
-        echo    2. 下载并安装PostgreSQL 12+
-        echo    3. 记住postgres用户密码
-        echo    4. 重新运行此脚本
+        echo Please install PostgreSQL:
+        echo    1. Visit https://www.postgresql.org/download/windows/
+        echo    2. Download and install PostgreSQL 12+
+        echo    3. Remember the postgres user password
+        echo    4. Re-run this script
         echo.
-        set /p skip_db=是否跳过数据库配置继续安装？ ^(Y/N^): 
+        set /p skip_db="Skip database configuration and continue? (Y/N): "
         if /i "!skip_db!"=="Y" (
-            echo ⏭️  跳过数据库配置
+            echo Skipping database configuration
         ) else (
             pause
             exit /b 1
         )
     ) else (
-        echo ✅ PostgreSQL已安装
-        echo 🔧 运行数据库配置脚本...
+        echo SUCCESS: PostgreSQL installed
+        echo Running database configuration script...
         
-        if exist "setup_postgresql_simple.ps1" (
-            powershell -ExecutionPolicy Bypass -Command "& {Set-ExecutionPolicy Bypass -Scope Process; .\setup_postgresql_simple.ps1}"
-        ) else if exist "setup_postgresql.ps1" (
+        if exist "setup_postgresql.ps1" (
             powershell -ExecutionPolicy Bypass -Command "& {Set-ExecutionPolicy Bypass -Scope Process; .\setup_postgresql.ps1}"
         ) else (
-            echo 🔧 手动配置数据库...
+            echo Manual database configuration...
             python init_database.py
         )
     )
 ) else (
-    echo ⏭️  跳过数据库配置，将仅提供基础功能
+    echo Skipping database configuration, basic features only
 )
 
-REM 安装完成
+:: Installation complete
 echo.
 echo ====================================================
-echo                  安装完成！
+echo                Installation Complete!
 echo ====================================================
 echo.
-echo ✅ 房价分析系统安装成功！
+echo SUCCESS: Housing Price Analysis System installed successfully!
 echo.
-echo 🌟 功能特性：
-echo    • 🏠 房价查询和搜索
-echo    • 📈 趋势分析和可视化  
-echo    • 🏙️ 城市对比分析
-echo    • 🤖 AI智能助手
+echo Features:
+echo    * House price search and query
+echo    * Trend analysis and visualization
+echo    * City comparison analysis
+echo    * AI intelligent assistant
 if "%db_choice%"=="1" (
-    echo    • 👥 用户管理系统 ^(已配置^)
+    echo    * User management system (configured)
 ) else (
-    echo    • 👥 用户管理系统 ^(未配置^)
+    echo    * User management system (not configured)
 )
 echo.
-echo 🚀 现在启动系统？
-set /p start_now=立即启动应用 ^(Y/N^): 
+echo Start system now?
+set /p start_now="Launch application immediately (Y/N): "
 
 if /i "%start_now%"=="Y" (
     echo.
-    echo 🎯 启动系统...
+    echo Starting system...
     call start_system.bat
 ) else (
     echo.
-    echo 📖 手动启动说明：
-    echo    1. 双击 start_system.bat
-    echo    2. 或运行 .\start_system.ps1
+    echo Manual startup instructions:
+    echo    1. Double-click start_system.bat
+    echo    2. Or run .\start_system.ps1
     echo.
-    echo 🌐 访问地址：
-    echo    前端应用: http://localhost:8501
-    echo    后端API: http://localhost:8000
+    echo Access URLs:
+    echo    Frontend: http://localhost:8501
+    echo    Backend API: http://localhost:8000
     echo.
-    echo 📚 更多帮助请查看 WINDOWS_GUIDE.md
+    echo For more help, see WINDOWS_GUIDE.md
 )
 
 echo.
-echo 感谢使用房价分析系统！ 🎉
+echo Thank you for using Housing Price Analysis System!
 pause

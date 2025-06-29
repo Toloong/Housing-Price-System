@@ -68,14 +68,11 @@ email-validator      # 邮箱验证
 ├── init_database.py      # 数据库初始化脚本
 ├── test_user_management.py # 用户管理功能测试
 ├── install.bat           # Windows一键安装程序
-├── setup_postgresql.sh   # PostgreSQL快速设置脚本 (Linux/macOS)
 ├── setup_postgresql.ps1  # PostgreSQL快速设置脚本 (Windows)
 ├── start_system.sh       # 系统启动脚本 (Linux/macOS)
-├── start_system.ps1      # 系统启动脚本 (Windows PowerShell)
-├── start_system.bat      # 系统启动脚本 (Windows 批处理)
-├── WINDOWS_GUIDE.md      # Windows用户快速指南
-├── WINDOWS_COMPLETE_GUIDE.md # Windows完整安装指南
-└── QUICK_START_WINDOWS.md # Windows快速参考卡片
+├── start_system.bat      # 系统启动脚本 (Windows)
+├── conversation_history.md # 开发历程记录
+└── requirements.txt      # Python依赖包列表
 ```
 
 ## 🚀 快速开始
@@ -146,9 +143,86 @@ pip install -r requirements.txt
    - 后端API：http://localhost:8000
    - API文档：http://localhost:8000/docs
 
-## 🪟 Windows用户专项说明
+## 🪟 Windows用户完整指南
 
 为Windows用户提供了完整的脚本工具集，实现一键安装和启动：
+
+### 📋 系统要求
+
+**必需软件**：
+- Windows 10/11
+- Python 3.8+ （从 https://python.org 下载，安装时务必勾选"Add to PATH"）
+
+**可选软件**（用于完整功能）：
+- PostgreSQL 12+ （从 https://www.postgresql.org/download/windows/ 下载，安装时记住postgres用户密码）
+
+### 🚀 安装方式选择
+
+#### 方式1: 一键安装程序（推荐新用户）
+
+**适用场景**: 首次使用，希望全自动安装
+
+```cmd
+# 双击运行一键安装程序
+install.bat
+```
+
+**特点**:
+- ✅ 全自动安装流程，友好的图形界面
+- ✅ 智能错误检测，可选数据库配置
+- ✅ 安装完成后自动启动系统
+
+#### 方式2: PowerShell脚本（推荐日常使用）
+
+**适用场景**: 日常启动，需要灵活控制
+
+```powershell
+# 右键项目文件夹 → "在终端中打开" 或 "PowerShell"
+.\start_system.ps1
+```
+
+**特点**:
+- ✅ 智能环境检测，自动依赖管理
+- ✅ 多种启动模式，详细状态提示
+
+#### 方式3: 批处理脚本（兼容模式）
+
+**适用场景**: 无法运行PowerShell脚本的环境
+
+```cmd
+# 双击运行批处理脚本
+start_system.bat
+```
+
+**特点**:
+- ✅ 最大兼容性，无需PowerShell权限
+- ✅ 图形化选择界面
+
+#### 方式4: 手动安装（高级用户）
+
+**适用场景**: 需要自定义配置或学习系统结构
+
+```cmd
+# 1. 创建虚拟环境
+python -m venv .venv
+
+# 2. 激活虚拟环境
+.venv\Scripts\activate
+
+# 3. 安装依赖
+pip install -r requirements.txt
+
+# 4. 配置数据库（可选）
+python init_database.py
+
+# 5. 启动后端（新终端）
+.venv\Scripts\activate
+uvicorn backend.main:app --reload --port 8000
+
+# 6. 启动前端（另一个新终端）
+.venv\Scripts\activate
+streamlit run frontend/app.py
+```
 
 ### Windows启动脚本说明
 
@@ -168,23 +242,133 @@ pip install -r requirements.txt
 - ✅ **错误处理**: 详细的错误提示和解决方案
 - ✅ **用户界面**: 彩色输出和友好的交互体验
 
-### 常见Windows问题解决
+### 🐘 PostgreSQL数据库配置
 
-**PowerShell执行策略问题**：
+#### 自动配置（推荐）
+```powershell
+.\setup_postgresql.ps1
+```
+
+#### 手动配置
+1. **安装PostgreSQL**: 访问 https://www.postgresql.org/download/windows/
+2. **配置数据库**: `python init_database.py`
+
+**数据库配置信息**:
+- 数据库名: Housing_Price_postgres
+- 用户名: Housing_Price_postgres  
+- 密码: 123456
+- 主机: localhost
+- 端口: 5432
+
+### 🌐 访问系统
+
+安装完成后，在浏览器中访问：
+
+| 服务 | 地址 | 用途 |
+|-----|------|------|
+| **前端应用** | http://localhost:8501 | 🎨 主要用户界面 |
+| **后端API** | http://localhost:8000 | 🔧 RESTful API服务 |
+| **API文档** | http://localhost:8000/docs | 📚 交互式API文档 |
+
+### ❗ Windows常见问题解决
+
+#### PowerShell执行策略问题
+**问题**: 提示"无法加载文件，因为在此系统上禁止运行脚本"
+
+**解决方案**:
 ```powershell
 Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope Process
 ```
 
-**PostgreSQL服务未启动**：
-脚本会自动检测并启动服务，或手动运行：
+#### Python未找到错误
+**问题**: 提示"'python' 不是内部或外部命令"
+
+**解决方案**:
+1. 从 https://python.org 下载安装Python
+2. 安装时务必勾选"Add to PATH"选项
+3. 重启命令提示符窗口
+4. 验证安装: `python --version`
+
+#### 端口被占用
+**问题**: 提示端口8000或8501已被占用
+
+**解决方案**:
 ```cmd
-net start postgresql-x64-13
+# 查看端口占用
+netstat -ano | findstr :8000
+netstat -ano | findstr :8501
+
+# 结束占用进程（替换<PID>为实际进程ID）
+taskkill /PID <PID> /F
 ```
 
-更多Windows使用说明请查看：
-- `WINDOWS_GUIDE.md` - Windows用户快速指南
-- `WINDOWS_COMPLETE_GUIDE.md` - Windows完整安装指南
-- `QUICK_START_WINDOWS.md` - Windows快速参考卡片
+#### PostgreSQL连接失败
+**问题**: 数据库连接失败或用户管理功能不可用
+
+**解决方案**:
+```cmd
+# 1. 检查PostgreSQL服务
+sc query postgresql-x64-13
+
+# 2. 启动PostgreSQL服务
+net start postgresql-x64-13
+
+# 3. 重新配置数据库
+.\setup_postgresql.ps1
+```
+
+#### 依赖安装失败
+**问题**: pip安装依赖时出错
+
+**解决方案**:
+```cmd
+# 升级pip
+python -m pip install --upgrade pip
+
+# 使用国内镜像源
+pip install -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
+```
+
+### 🔄 更新和维护
+
+```cmd
+# 更新数据
+cd scraper
+scrapy crawl housing_spider
+
+# 重置数据库
+python init_database.py
+
+# 清除缓存（在应用界面中点击"刷新页面缓存"按钮）
+```
+
+### ⏹️ 停止系统
+
+**正常停止**: 在运行脚本的命令行窗口中按 `Ctrl + C`
+
+**强制停止**:
+```cmd
+taskkill /IM python.exe /F
+taskkill /IM uvicorn.exe /F
+```
+
+### 🎉 成功标志
+
+当看到以下内容时，说明系统启动成功：
+
+**后端启动成功**:
+```
+INFO:     Uvicorn running on http://127.0.0.1:8000 (Press CTRL+C to quit)
+INFO:     Started reloader process
+```
+
+**前端启动成功**:
+```
+You can now view your Streamlit app in your browser.
+Local URL: http://localhost:8501
+```
+
+浏览器会自动打开，显示房价分析系统主页。
 
 ## 🔐 用户管理功能
 
