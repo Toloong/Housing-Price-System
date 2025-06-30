@@ -516,7 +516,7 @@ if page == "房价查询":
                     st.subheader("各区域房价对比柱状图")
                     fig = px.bar(df, x="area", y="price", title=f"{city}各区域房价对比",
                                  labels={"area": "区域", "price": "价格"})
-                    st.plotly_chart(fig, use_container_width=True)
+                    st.plotly_chart(fig, use_container_width=True, config={"staticPlot": True})
                 else:
                     st.warning("未找到该城市的房价数据。")
             else:
@@ -571,8 +571,8 @@ if page == "趋势分析":
                         fig = px.line(df_trend, x='date', y='price', title=f"{trend_city} {trend_area} 房价走势分析", 
                                       markers=True, labels={"date": "日期", "price": "价格 (元/平米)"})
                         fig.update_layout(height=500)
-                        st.plotly_chart(fig, use_container_width=True)
-                        
+                        st.plotly_chart(fig, use_container_width=True, config={"staticPlot": True})
+
                         # 显示趋势统计信息
                         col1, col2, col3, col4 = st.columns(4)
                         with col1:
@@ -630,8 +630,8 @@ if page == "趋势分析":
                                          labels={"date": "日期", "price": "价格 (元/平米)", "area": "区域"},
                                          markers=True)
                             fig.update_layout(height=600, legend=dict(orientation="v", yanchor="top", y=1, xanchor="left", x=1.01))
-                            st.plotly_chart(fig, use_container_width=True)
-                            
+                            st.plotly_chart(fig, use_container_width=True, config={"staticPlot": True})
+
                             # 显示各区域统计对比
                             st.subheader("📊 各区域统计对比")
                             
@@ -725,7 +725,7 @@ if page == "城市对比":
                                      barmode='group',
                                      title=f'{city1} vs {city2} 近6个月房价对比',
                                      labels={'date': '月份', 'price': '价格(元)', '城市': '城市'})
-                        st.plotly_chart(fig, use_container_width=True)
+                        st.plotly_chart(fig, use_container_width=True, config={"staticPlot": True})
 
                         st.subheader("详细数据")
                         st.write(f"**{city1}** 的详细数据:")
