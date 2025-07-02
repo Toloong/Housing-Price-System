@@ -8,6 +8,14 @@ import datetime
 import os
 import json
 from typing import Optional
+from fastapi import APIRouter, HTTPException, Depends
+from pydantic import BaseModel
+from typing import List, Optional
+import pandas as pd
+import numpy as np
+import os
+import joblib
+from datetime import datetime, timedelta
 
 # 导入数据库模块（使用SQLite）
 from backend.database import init_sqlite_database, SQLiteUserManager, log_sqlite_user_activity
@@ -646,3 +654,298 @@ def protected_trend(city: str, area: str, current_user: dict = Depends(get_curre
     
     # 调用原有的趋势分析功能
     return trend(city, area)
+
+# 创建预测相关的路由
+prediction_router = APIRouter()
+
+# 预测请求模型
+class PredictionRequest(BaseModel):
+    city: str
+    area: str
+    model_type: str = "DNN"  # DNN, LSTM, Prophet
+    periods: int = 6  # 预测未来几个月
+    features: List[str] = ["month", "year", "price"]
+
+# 预测结果模型
+class PredictionResponse(BaseModel):
+    success: bool
+    message: Optional[str] = None
+    predictions: Optional[List[dict]] = None
+    metrics: Optional[dict] = None
+
+# 加载房价数据
+def load_housing_data():
+    csv_path = os.path.join("data", "housing_data.csv")
+    if not os.path.exists(csv_path):
+        raise FileNotFoundError(f"CSV文件不存在: {csv_path}")
+
+    return pd.read_csv(csv_path)
+
+# 获取预训练模型路径
+def get_model_path(city: str, area: str, model_type: str):
+    model_dir = os.path.join("models", city, area)
+    os.makedirs(model_dir, exist_ok=True)
+
+    filename = f"{model_type.lower()}_model.pkl"
+    return os.path.join(model_dir, filename)
+
+# 训练并获取模型
+def get_or_train_model(city: str, area: str, model_type: str, df: pd.DataFrame):
+    model_path = get_model_path(city, area, model_type)
+
+    # 如果模型已存在并且不超过7天，则直接加载
+    if os.path.exists(model_path):
+        model_time = os.path.getmtime(model_path)
+        if (datetime.now() - datetime.fromtimestamp(model_time)).days < 7:
+            return joblib.load(model_path)
+
+    # 否则重新训练模型
+    if model_type == "DNN":
+        model = train_dnn_model(df)
+    elif model_type == "LSTM":
+        model = train_lstm_model(df)
+    elif model_type == "Prophet":
+        model = train_prophet_model(df)
+    else:
+        raise ValueError(f"不支持的模型类型: {model_type}")
+
+    # 保存模型
+    joblib.dump(model, model_path)
+    return model
+
+# DNN模型训练函数
+def train_dnn_model(df):
+    # 简化版实现，实际项目中需要更复杂的模型
+    from sklearn.preprocessing import MinMaxScaler
+    from sklearn.model_selection import train_test_split
+    from tensorflow.keras.models import Sequential
+    from tensorflow.keras.layers import Dense, Dropout
+
+    # 特征工程
+    df['month'] = pd.to_datetime(df['date']).dt.month
+    df['year'] = pd.to_datetime(df['date']).dt.year
+
+    # 准备数据
+    X = df[['month', 'year']].values
+    y = df['price'].values
+
+    # 归一化
+    X_scaler = MinMaxScaler()
+    y_scaler = MinMaxScaler()
+
+    X_scaled = X_scaler.fit_transform(X)
+    y_scaled = y_scaler.fit_transform(y.reshape(-1, 1))
+
+    # 模型定义
+    model = Sequential([
+        Dense(64, activation='relu', input_shape=(X.shape[1],)),
+        Dropout(0.2),
+        Dense(32, activation='relu'),
+        Dropout(0.2),
+        Dense(1)
+    ])
+
+    model.compile(optimizer='adam', loss='mse')
+    model.fit(X_scaled, y_scaled, epochs=100, verbose=0)
+
+    return {
+        'model': model,
+        'X_scaler': X_scaler,
+        'y_scaler': y_scaler
+    }
+
+# LSTM模型训练函数
+def train_lstm_model(df):
+    from tensorflow.keras.models import Sequential
+    from tensorflow.keras.layers import LSTM, Dense, Dropout
+    from sklearn.preprocessing import MinMaxScaler
+    import numpy as np
+
+    # 准备数据
+    df = df.sort_values('date')
+    prices = df['price'].values.reshape(-1, 1)
+
+    # 归一化
+    scaler = MinMaxScaler()
+    prices_scaled = scaler.fit_transform(prices)
+
+    # 创建序列数据
+    lookback = 6
+    X, y = [], []
+
+    for i in range(len(prices_scaled) - lookback):
+        X.append(prices_scaled[i:i+lookback])
+        y.append(prices_scaled[i+lookback])
+
+    X = np.array(X)
+    y = np.array(y)
+
+    # 模型定义
+    model = Sequential([
+        LSTM(50, return_sequences=True, input_shape=(lookback, 1)),
+        Dropout(0.2),
+        LSTM(50),
+        Dropout(0.2),
+        Dense(1)
+    ])
+
+    model.compile(optimizer='adam', loss='mse')
+    model.fit(X, y, epochs=100, verbose=0)
+
+    return {
+        'model': model,
+        'scaler': scaler,
+        'lookback': lookback
+    }
+
+# Prophet模型训练函数
+def train_prophet_model(df):
+    from prophet import Prophet
+
+    # 准备数据
+    prophet_df = df[['date', 'price']].rename(columns={'date': 'ds', 'price': 'y'})
+
+    # 训练模型
+    model = Prophet()
+    model.fit(prophet_df)
+
+    return model
+
+# 预测接口
+@prediction_router.post("/predict", response_model=PredictionResponse)
+async def predict_prices(request: PredictionRequest):
+    try:
+        # 从CSV加载数据
+        try:
+            all_data = load_housing_data()
+        except FileNotFoundError as e:
+            return {"success": False, "message": str(e)}
+
+        # 筛选指定城市和区域的数据
+        df = all_data[(all_data['city'] == request.city) & (all_data['area'] == request.area)]
+
+        if df.empty:
+            return {"success": False, "message": f"没有找到{request.city}{request.area}的历史数据"}
+
+        # 确保日期列为日期类型
+        df['date'] = pd.to_datetime(df['date'])
+
+        # 获取或训练模型
+        model_data = get_or_train_model(request.city, request.area, request.model_type, df)
+
+        # 生成预测
+        last_date = df['date'].max()
+        future_dates = pd.date_range(start=last_date + pd.Timedelta(days=30), periods=request.periods, freq='M')
+
+        if request.model_type == "DNN":
+            predictions = predict_with_dnn(model_data, future_dates)
+        elif request.model_type == "LSTM":
+            predictions = predict_with_lstm(model_data, df, future_dates)
+        elif request.model_type == "Prophet":
+            predictions = predict_with_prophet(model_data, future_dates)
+        else:
+            return {"success": False, "message": f"不支持的模型类型: {request.model_type}"}
+
+        # 评估指标
+        metrics = calculate_metrics(df)
+
+        return {
+            "success": True,
+            "predictions": predictions,
+            "metrics": metrics
+        }
+
+    except Exception as e:
+        return {"success": False, "message": f"预测失败: {str(e)}"}
+
+# DNN预测函数
+def predict_with_dnn(model_data, future_dates):
+    model = model_data['model']
+    X_scaler = model_data['X_scaler']
+    y_scaler = model_data['y_scaler']
+
+    # 准备未来数据
+    future_features = []
+    for date in future_dates:
+        month = date.month
+        year = date.year
+        future_features.append([month, year])
+
+    future_features = np.array(future_features)
+    future_features_scaled = X_scaler.transform(future_features)
+
+    # 预测
+    future_pred_scaled = model.predict(future_features_scaled)
+    future_pred = y_scaler.inverse_transform(future_pred_scaled)
+
+    # 返回结果
+    predictions = []
+    for i, date in enumerate(future_dates):
+        predictions.append({
+            "date": date.strftime("%Y-%m-%d"),
+            "predicted_price": float(future_pred[i][0])
+        })
+
+    return predictions
+
+# LSTM预测函数
+def predict_with_lstm(model_data, df, future_dates):
+    model = model_data['model']
+    scaler = model_data['scaler']
+    lookback = model_data['lookback']
+
+    # 准备最后一个序列
+    prices = df['price'].values.reshape(-1, 1)
+    prices_scaled = scaler.transform(prices)
+    last_sequence = prices_scaled[-lookback:].reshape(1, lookback, 1)
+
+    # 预测未来
+    predictions = []
+    current_sequence = last_sequence
+
+    for date in future_dates:
+        next_pred = model.predict(current_sequence)[0][0]
+        next_pred_original = scaler.inverse_transform([[next_pred]])[0][0]
+
+        predictions.append({
+            "date": date.strftime("%Y-%m-%d"),
+            "predicted_price": float(next_pred_original)
+        })
+
+        # 更新序列
+        current_sequence = np.append(current_sequence[0, 1:, 0], next_pred)
+        current_sequence = current_sequence.reshape(1, lookback, 1)
+
+    return predictions
+
+# Prophet预测函数
+def predict_with_prophet(model, future_dates):
+    # 创建未来数据框
+    future_df = pd.DataFrame({"ds": future_dates})
+
+    # 预测
+    forecast = model.predict(future_df)
+
+    # 返回结果
+    predictions = []
+    for _, row in forecast.iterrows():
+        predictions.append({
+            "date": row['ds'].strftime("%Y-%m-%d"),
+            "predicted_price": float(row['yhat'])
+        })
+
+    return predictions
+
+# 计算评估指标
+def calculate_metrics(df):
+    # 简单计算统计指标
+    return {
+        "data_points": len(df),
+        "mean_price": float(df['price'].mean()),
+        "min_price": float(df['price'].min()),
+        "max_price": float(df['price'].max()),
+        "std_price": float(df['price'].std())
+    }
+
+# 将路由添加到主应用
+app.include_router(prediction_router, tags=["prediction"])

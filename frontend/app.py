@@ -332,12 +332,12 @@ if st.session_state.user_mode == "logged_in":
         # 根据用户权限决定导航选项
         if is_current_user_admin():
             # 管理员可以看到用户管理
-            nav_options = ["主页", "房价查询", "趋势分析", "城市对比", "数据洞察", "AI助手", "用户管理"]
-            nav_icons = ['house', 'search', 'graph-up', 'distribute-horizontal', 'clipboard-data', 'robot', 'people']
+            nav_options = ["主页", "房价查询", "趋势分析", "城市对比", "数据洞察", "AI助手", "用户管理", "房价预测"]
+            nav_icons = ['house', 'search', 'graph-up', 'distribute-horizontal', 'clipboard-data', 'robot', 'people', 'graph-up-arrow']
         else:
             # 普通用户看不到用户管理
-            nav_options = ["主页", "房价查询", "趋势分析", "城市对比", "数据洞察", "AI助手"]
-            nav_icons = ['house', 'search', 'graph-up', 'distribute-horizontal', 'clipboard-data', 'robot']
+            nav_options = ["主页", "房价查询", "趋势分析", "城市对比", "数据洞察", "AI助手", "房价预测"]
+            nav_icons = ['house', 'search', 'graph-up', 'distribute-horizontal', 'clipboard-data', 'robot', 'graph-up-arrow']
         
         page = option_menu(
             menu_title=None,
@@ -360,8 +360,8 @@ elif st.session_state.user_mode == "guest":
     col1, col2 = st.columns([4, 1])
     with col1:
         # 游客只能看到基础功能，严格禁止用户管理
-        nav_options = ["主页", "房价查询", "趋势分析", "城市对比", "数据洞察", "AI助手"]
-        nav_icons = ['house', 'search', 'graph-up', 'distribute-horizontal', 'clipboard-data', 'robot']
+        nav_options = ["主页", "房价查询", "趋势分析", "城市对比", "数据洞察", "AI助手", "房价预测"]
+        nav_icons = ['house', 'search', 'graph-up', 'distribute-horizontal', 'clipboard-data', 'robot', 'graph-up-arrow']
         
         page = option_menu(
             menu_title=None,
@@ -1189,3 +1189,215 @@ elif page == "用户管理":
         - 不要在公共电脑上保持长期登录
         - 发现异常登录请及时联系管理员
         """)
+# --- 房价预测页面 ---
+if page == "房价预测":
+    st.title("🔮 房价深度学习预测")
+    st.markdown("""
+    使用深度学习模型预测未来房价走势。选择城市、区域和预测模型，
+    系统将基于历史数据训练模型并给出预测结果。
+    """)
+
+    # 选择城市和区域
+    col1, col2 = st.columns(2)
+    with col1:
+        cities = load_all_cities()
+        selected_city = st.selectbox("选择城市", cities, index=0)
+
+    with col2:
+        areas = load_areas_for_city(selected_city)
+        if areas:
+            selected_area = st.selectbox("选择区域", areas, index=0)
+        else:
+            selected_area = st.text_input("输入区域名称", "")
+
+    # 模型选择
+    st.subheader("模型选择与参数")
+
+    col1, col2 = st.columns(2)
+    with col1:
+        model_type = st.radio(
+            "选择预测模型",
+            ["DNN (全连接神经网络)", "LSTM (长短期记忆网络)", "Prophet (时序预测)"],
+            help="不同模型适用于不同类型的数据和预测任务"
+        )
+
+    with col2:
+        periods = st.slider(
+            "预测未来月数",
+            min_value=1,
+            max_value=24,
+            value=6,
+            help="预测未来几个月的房价走势"
+        )
+
+    # 开始预测
+    if st.button("开始预测", type="primary"):
+        if not selected_city or not selected_area:
+            st.error("请选择城市和区域")
+        else:
+            with st.spinner("正在训练模型并生成预测..."):
+                try:
+                    # 准备请求数据
+                    model_name = model_type.split(" ")[0]  # 提取模型名称
+
+                    request_data = {
+                        "city": selected_city,
+                        "area": selected_area,
+                        "model_type": model_name,
+                        "periods": periods
+                    }
+
+                    # 发送请求
+                    response = requests.post(
+                        f"{BACKEND_URL}/predict",
+                        json=request_data,
+                        headers=get_auth_headers()
+                    )
+
+                    if response.status_code == 200:
+                        result = response.json()
+
+                        if result["success"]:
+                            st.success("✅ 预测完成")
+
+                            # 显示预测结果
+                            predictions = result["predictions"]
+                            metrics = result["metrics"]
+
+                            # 显示统计指标
+                            st.subheader("数据统计")
+                            col1, col2, col3, col4 = st.columns(4)
+
+                            with col1:
+                                st.metric("历史数据点数", metrics["data_points"])
+                            with col2:
+                                st.metric("平均价格", f"{metrics['mean_price']:,.0f}")
+                            with col3:
+                                st.metric("最高价格", f"{metrics['max_price']:,.0f}")
+                            with col4:
+                                st.metric("最低价格", f"{metrics['min_price']:,.0f}")
+
+                            # 创建预测数据框
+                            df_pred = pd.DataFrame(predictions)
+                            df_pred["date"] = pd.to_datetime(df_pred["date"])
+
+                            # 获取历史数据用于绘图
+                            hist_response = requests.get(
+                                f"{BACKEND_URL}/trend",
+                                params={"city": selected_city, "area": selected_area}
+                            )
+
+                            if hist_response.status_code == 200:
+                                hist_data = hist_response.json().get("trend", [])
+                                df_hist = pd.DataFrame(hist_data)
+                                df_hist["date"] = pd.to_datetime(df_hist["date"])
+
+                                # 绘制预测图
+                                st.subheader("预测结果可视化")
+
+                                fig = px.line()
+
+                                # 添加历史数据
+                                fig.add_scatter(
+                                    x=df_hist["date"],
+                                    y=df_hist["price"],
+                                    name="历史数据",
+                                    line=dict(color="blue")
+                                )
+
+                                # 添加预测数据
+                                fig.add_scatter(
+                                    x=df_pred["date"],
+                                    y=df_pred["predicted_price"],
+                                    name="预测数据",
+                                    line=dict(color="red", dash="dash")
+                                )
+
+                                fig.update_layout(
+                                    title=f"{selected_city} {selected_area} 房价预测 (未来{periods}个月)",
+                                    xaxis_title="日期",
+                                    yaxis_title="房价 (元/平方米)",
+                                    height=500
+                                )
+
+                                st.plotly_chart(fig, use_container_width=True)
+
+                                # 显示预测数据表格
+                                st.subheader("预测详细数据")
+
+                                # 格式化日期和价格
+                                df_display = df_pred.copy()
+                                df_display["date"] = df_display["date"].dt.strftime("%Y-%m-%d")
+                                df_display["predicted_price"] = df_display["predicted_price"].round(2)
+                                df_display.columns = ["日期", "预测价格 (元/平方米)"]
+
+                                st.dataframe(df_display, use_container_width=True)
+
+                                # 提供下载链接
+                                csv = df_pred.to_csv(index=False)
+                                st.download_button(
+                                    "📥 下载预测数据 (CSV)",
+                                    data=csv,
+                                    file_name=f"{selected_city}_{selected_area}_prediction.csv",
+                                    mime="text/csv"
+                                )
+
+                                # 分析预测趋势
+                                first_price = df_pred["predicted_price"].iloc[0]
+                                last_price = df_pred["predicted_price"].iloc[-1]
+                                change = last_price - first_price
+                                change_pct = (change / first_price) * 100
+
+                                trend_direction = "上涨" if change > 0 else "下跌" if change < 0 else "保持稳定"
+                                trend_icon = "📈" if change > 0 else "📉" if change < 0 else "📊"
+
+                                st.subheader("预测趋势分析")
+                                st.info(
+                                    f"{trend_icon} 未来{periods}个月内，{selected_city}{selected_area}的房价预计将{trend_direction} {abs(change_pct):.2f}%，从 {first_price:.2f} 变化到 {last_price:.2f} 元/平方米。")
+
+                            else:
+                                st.error("获取历史数据失败，无法生成对比图")
+
+                        else:
+                            st.error(f"预测失败: {result.get('message', '未知错误')}")
+
+                    else:
+                        st.error(f"请求失败，状态码: {response.status_code}")
+
+                except Exception as e:
+                    st.error(f"预测过程中发生错误: {str(e)}")
+
+    # 模型说明
+    with st.expander("深度学习模型说明"):
+        st.markdown("""
+        ### 模型类型介绍
+
+        #### DNN (全连接神经网络)
+        - **特点**: 结构简单，适合一般回归问题
+        - **优势**: 训练速度快，易于实现
+        - **适用场景**: 特征较少，关系相对简单的数据
+
+        #### LSTM (长短期记忆网络)
+        - **特点**: 专门设计用于处理时序数据
+        - **优势**: 能捕捉长期依赖关系，保留历史信息
+        - **适用场景**: 房价走势等时间序列预测
+
+        #### Prophet (Facebook时序预测模型)
+        - **特点**: 专为时间序列数据设计的预测工具
+        - **优势**: 自动处理季节性、节假日效应等
+        - **适用场景**: 有明显季节性波动的房价数据
+
+        ### 注意事项
+        - 预测准确性依赖于历史数据的质量和数量
+        - 预测时间越长，不确定性越大
+        - 建议同时比较多个模型的预测结果
+        - 深度学习预测仅供参考，实际房价受多种因素影响
+        """)
+
+# 在导航栏中添加"房价预测"选项
+if st.session_state.user_mode == "logged_in":
+    nav_options = ["主页", "房价查询", "趋势分析", "城市对比", "数据洞察", "AI助手", "房价预测"]
+    nav_icons = ['house', 'search', 'graph-up', 'distribute-horizontal', 'clipboard-data', 'robot', 'graph-up-arrow']
+else:
+    nav_options = ["主页", "房价查询", "趋势分析", "城市对比", "数据洞察", "AI助手", "房价预测"]
+    nav_icons = ['house', 'search', 'graph-up', 'distribute-horizontal', 'clipboard-data', 'robot', 'graph-up-arrow']

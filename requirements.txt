@@ -10,3 +10,7 @@ scrapy
 pydantic
 python-dateutil
 email-validator
+tensorflow>=2.6.0
+prophet>=1.1.1
+scikit-learn>=1.0.0
+joblib>=1.1.0
