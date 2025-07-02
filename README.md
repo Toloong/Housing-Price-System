@@ -1,6 +1,20 @@
-# 房价分析系统
+ # 房价分析系统
 
 基于 FastAPI + Streamlit + SQLite 的房价数据分析系统，支持用户管理和数据可视化。
+
+## 🎉 v3.0 重大更新
+
+### ✨ 新增功能
+- **🔮 深度学习房价预测**: 支持多种AI模型预测未来房价走势
+- **🧠 三种预测模型**: DNN、LSTM和Prophet时序预测
+- **📊 预测结果可视化**: 直观展示历史数据与预测趋势对比
+- **📈 趋势分析报告**: 自动生成未来房价走势分析报告
+
+### 🧠 AI预测能力
+- 基于神经网络的房价趋势预测
+- 长短期记忆网络时间序列分析
+- Facebook Prophet时序预测模型支持
+- 历史数据与预测数据对比图表
 
 ## 🎉 v2.0 重大更新
 
@@ -61,6 +75,8 @@ Housing_Price/
 │   └── style.css          # 样式文件
 ├── data/                  # 数据文件
 │   └── housing_data.csv   # 房价数据
+├── models/                # 预训练模型存储
+│   └── [城市]/[区域]      # 按区域组织的模型文件
 ├── scraper/               # 数据爬虫(可选)
 ├── start.bat              # 一键启动脚本
 ├── requirements.txt       # Python依赖
@@ -91,6 +107,13 @@ Housing_Price/
 - **一键游客模式**: 无需注册即可体验系统功能
 - **安全权限控制**: 四层安全验证，确保系统安全性
 
+## 🔮 房价预测功能
+- **多模型支持**: DNN、LSTM和Prophet三种预测模型
+- **交互式预测**: 可选择城市、区域和预测周期
+- **预测可视化**: 直观展示历史数据与预测对比
+- **趋势分析**: 自动生成涨跌幅分析报告
+- **数据下载**: 支持预测结果CSV导出
+
 ## 📊 功能覆盖
 
 ### ✅ 所有用户可访问
@@ -98,6 +121,7 @@ Housing_Price/
 - 📈 趋势分析和城市对比  
 - 🤖 AI智能分析助手
 - 📊 数据洞察和统计
+- 🔮 房价深度学习预测
 
 ### 🔐 仅登录用户可访问
 - 💾 个人偏好保存
@@ -117,6 +141,13 @@ Housing_Price/
 - 数据可视化图表
 - AI智能分析助手
 
+### 🔮 深度学习预测
+- DNN全连接神经网络预测
+- LSTM长短期记忆网络预测
+- Prophet时序预测模型
+- 历史与预测数据对比
+- 预测结果导出功能
+
 ### 👥 用户管理
 - 用户注册/登录
 - JWT令牌认证
@@ -132,6 +163,7 @@ Housing_Price/
 ### 🔧 技术栈
 - **后端**: FastAPI, SQLite, Pydantic
 - **前端**: Streamlit, Pandas, Plotly
+- **AI模型**: TensorFlow, Prophet, scikit-learn
 - **数据**: CSV数据源，支持爬虫扩展
 - **认证**: JWT令牌认证
 
@@ -197,6 +229,27 @@ pip install -r requirements.txt
 python -c "from backend.database import init_sqlite_database; init_sqlite_database()"
 ```
 
+## 🧩 依赖包列表
+
+```bash
+# 核心依赖
+pip install requests
+pip install beautifulsoup4
+pip install pandas
+pip install fake-useragent
+
+# 深度学习依赖
+pip install tensorflow
+pip install scikit-learn
+pip install prophet
+pip install joblib
+
+# 可选但推荐的依赖
+pip install lxml  # 更快的HTML解析器
+pip install openpyxl  # 如果需要保存为Excel
+pip install tqdm  # 进度条显示
+```
+
 ## 🔧 开发说明
 
 ### 主要API接口
@@ -207,6 +260,7 @@ python -c "from backend.database import init_sqlite_database; init_sqlite_databa
 - `GET /compare?city1=城市1&city2=城市2` - 城市对比
 - `GET /stats?city=城市名` - 统计数据
 - `POST /ai/analyze` - AI智能分析
+- `POST /predict` - 房价深度学习预测
 
 #### 用户管理接口
 - `POST /auth/register` - 用户注册
@@ -246,6 +300,18 @@ curl -X POST "http://localhost:8000/ai/analyze" \
   -d '{
     "query": "深圳的房价趋势如何？",
     "city": "深圳"
+  }'
+```
+
+### 房价预测
+```bash
+curl -X POST "http://localhost:8000/predict" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "city": "深圳",
+    "area": "南山区",
+    "model_type": "DNN",
+    "periods": 6
   }'
 ```
 
@@ -289,8 +355,8 @@ pip install -r requirements.txt --force-reinstall
 
 ## 🛠️ 开发计划
 
-- [ ] 添加更多城市数据
-- [ ] 实现房价预测模型
+- [x] 添加更多城市数据
+- [x] 实现房价预测模型
 - [ ] 优化AI分析算法
 - [ ] 添加邮件通知功能
 - [ ] 实现数据导出功能
@@ -318,6 +384,9 @@ MIT License
 | 数据完整性 | ⭐⭐⭐⭐ 良好 | ⭐⭐⭐⭐⭐ 企业级 |
 
 ### 已验证功能
+- ✅ 深度学习房价预测 (v3.0)
+- ✅ 多种AI预测模型 (v3.0)
+- ✅ 预测结果可视化 (v3.0)
 - ✅ 独立登录页面系统 (v2.0)
 - ✅ 游客模式一键体验 (v2.0)
 - ✅ 管理员权限控制 (v2.0)
@@ -336,8 +405,16 @@ MIT License
 - **安全可靠**: 多层权限验证，经过全面测试
 - **易于部署**: 单文件数据库，便于迁移
 - **用户友好**: 游客模式 + 专业登录界面
+- **AI预测**: 多种深度学习模型预测房价走势
 
 ## 📝 版本历史
+
+### v3.0.0 (2025-07-02)
+- 🔮 新增深度学习房价预测功能
+- 🧠 支持DNN、LSTM和Prophet三种预测模型
+- 📊 新增预测结果可视化与数据导出
+- 📈 自动生成预测趋势分析报告
+- 🗃️ 添加模型缓存与复用机制
 
 ### v2.0.0 (2025-06-29)
 - ✨ 新增独立登录页面系统
@@ -369,3 +446,4 @@ MIT License
 ---
 
 ⭐ 如果这个项目对您有帮助，请给个Star支持一下！
+
