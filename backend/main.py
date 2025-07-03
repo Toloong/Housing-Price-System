@@ -16,19 +16,192 @@ import numpy as np
 import os
 import joblib
 from datetime import datetime, timedelta
-
 # 导入数据库模块（使用SQLite）
 from backend.database import init_sqlite_database, SQLiteUserManager, log_sqlite_user_activity
 UserManager = SQLiteUserManager
 log_user_activity = log_sqlite_user_activity
 DB_TYPE = "sqlite"
 
+import os
+import json
+import requests
+from typing import Dict, Any, Optional
+import pandas as pd
+
+class AIService:
+    def __init__(self, api_key: str = None):
+        self.api_key = api_key or "MDc3YWI0YjUtMDdlYi00Y2Y3LTgzMTAtZTA4OGQ5NTBkOGFh"
+        self.api_url = "https://chat3.eqing.tech/v1/chat/completions"
+
+        if not self.api_key:
+            raise ValueError("AI API密钥未设置")
+
+    def chat_with_ai(self, prompt: str, system_prompt: str = None, temperature: float = 0.3) -> Dict[str, Any]:
+        """
+        调用AI API进行对话 - 修复版本
+        """
+        try:
+            headers = {
+                "Content-Type": "application/json",
+                "Authorization": f"Bearer {self.api_key}"
+            }
+
+            messages = []
+
+            # 添加系统提示
+            if system_prompt:
+                messages.append({
+                    "role": "system",
+                    "content": system_prompt
+                })
+
+            # 添加用户消息
+            messages.append({
+                "role": "user",
+                "content": prompt
+            })
+
+            payload = {
+                "model": "gpt-3.5-turbo",
+                "messages": messages,
+                "temperature": temperature,
+                "max_tokens": 1500,  # 减少token数量避免超限
+                "stream": False
+            }
+
+            print(f"🔄 发送AI请求...")
+            print(f"📝 Prompt长度: {len(prompt)} 字符")
+
+            response = requests.post(
+                self.api_url,
+                headers=headers,
+                json=payload,
+                timeout=30
+            )
+
+            print(f"📊 API响应状态: {response.status_code}")
+
+            if response.status_code != 200:
+                print(f"❌ API错误响应: {response.text}")
+                return {"error": f"API调用失败: {response.status_code} - {response.text}"}
+
+            result = response.json()
+            print(f"✅ API调用成功")
+
+            # 提取AI回复内容
+            if "choices" in result and len(result["choices"]) > 0:
+                content = result["choices"][0]["message"]["content"]
+
+                # 直接返回文本内容，不要尝试解析JSON
+                return {
+                    "text": content,
+                    "raw_response": True,
+                    "model_used": result.get("model", "gpt-3.5-turbo"),
+                    "tokens_used": result.get("usage", {}).get("total_tokens", 0)
+                }
+            else:
+                print(f"❌ API返回格式异常: {result}")
+                return {"error": "API返回格式异常"}
+
+        except requests.exceptions.Timeout:
+            print("❌ 请求超时")
+            return {"error": "请求超时，请稍后重试"}
+        except requests.exceptions.ConnectionError:
+            print("❌ 网络连接错误")
+            return {"error": "网络连接失败"}
+        except requests.exceptions.RequestException as e:
+            print(f"❌ 网络请求错误: {str(e)}")
+            return {"error": f"网络请求失败: {str(e)}"}
+        except json.JSONDecodeError as e:
+            print(f"❌ JSON解析错误: {str(e)}")
+            return {"error": f"响应解析失败: {str(e)}"}
+        except Exception as e:
+            print(f"❌ 未知错误: {str(e)}")
+            return {"error": f"AI API调用失败: {str(e)}"}
+
+    def analyze_housing_trend(self, city: str, area: Optional[str], data: pd.DataFrame) -> Dict[str, Any]:
+        """
+        使用AI分析房价趋势 - 修复版本
+        """
+        try:
+            if data.empty:
+                return {"error": "没有足够的数据进行分析"}
+
+            # 数据预处理和统计计算
+            data_sorted = data.sort_values('date')
+            recent_data = data_sorted.tail(12)  # 最近12个月
+
+            # 计算基础统计
+            current_price = float(recent_data['price'].iloc[-1]) if not recent_data.empty else None
+            avg_price = float(recent_data['price'].mean()) if not recent_data.empty else None
+            price_change = None
+            price_change_pct = None
+
+            if len(recent_data) >= 2:
+                old_price = float(recent_data['price'].iloc[0])
+                price_change = current_price - old_price
+                price_change_pct = (price_change / old_price) * 100
+
+            location = f"{city}市{area}区域" if area else f"{city}市"
+
+            # 简化的分析提示，避免过长
+            system_prompt = """你是专业的房地产分析师。请用中文分析房价数据，提供简洁实用的分析和建议。"""
+
+            user_prompt = f"""分析{location}房价趋势：
+
+当前价格：{current_price:.0f}元/㎡
+平均价格：{avg_price:.0f}元/㎡
+价格变化：{price_change_pct:.1f}%
+数据期间：{len(recent_data)}个月
+
+请提供：
+1. 趋势判断（上涨/下跌/平稳）
+2. 价格水平评估
+3. 投资建议（3-4条）
+4. 风险提示
+
+请用简洁专业的语言回答，重点突出。"""
+
+            print(f"🤖 开始AI分析: {location}")
+
+            # 调用AI API
+            result = self.chat_with_ai(user_prompt, system_prompt)
+
+            # 处理AI响应
+            if "error" not in result:
+                # 添加基础统计数据
+                result["basic_stats"] = {
+                    "current_price": round(current_price, 2) if current_price else None,
+                    "average_price": round(avg_price, 2) if avg_price else None,
+                    "price_change": round(price_change, 2) if price_change else None,
+                    "price_change_percentage": round(price_change_pct, 2) if price_change_pct else None,
+                    "sample_count": len(recent_data),
+                    "price_range": {
+                        "min": round(float(recent_data['price'].min()), 2),
+                        "max": round(float(recent_data['price'].max()), 2)
+                    }
+                }
+                print(f"✅ AI分析完成")
+            else:
+                print(f"❌ AI分析失败: {result['error']}")
+
+            return result
+
+        except Exception as e:
+            print(f"❌ 房价趋势分析出错: {str(e)}")
+            return {"error": f"分析失败: {str(e)}"}
+
+# 创建全局服务实例
+ai_service = AIService()
+
+
+
 # Auth相关模型和函数
 from pydantic import BaseModel, EmailStr
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 import re
 
-security = HTTPBearer()
+security = HTTPBearer(auto_error=False)
 
 class UserRegister(BaseModel):
     username: str
@@ -89,13 +262,13 @@ def require_admin_permission(current_user: dict = Depends(get_current_user)):
     return current_user
 
 def get_optional_user(credentials: Optional[HTTPAuthorizationCredentials] = Depends(security)):
-    """可选的用户认证（允许匿名访问）"""
     if not credentials:
         return None
     try:
         return get_current_user(credentials)
     except HTTPException:
         return None
+
 
 app = FastAPI(title="房价分析系统后端API")
 
@@ -287,197 +460,6 @@ class AIQueryRequest(BaseModel):
     city: Optional[str] = None
     area: Optional[str] = None
 
-# AI 助手分析函数
-def analyze_price_trend(city_data):
-    """分析房价趋势"""
-    try:
-        if city_data.empty:
-            return "暂无数据可供分析"
-        
-        # 按时间排序
-        city_data = city_data.sort_values('date')
-        recent_data = city_data.tail(6)  # 最近6个月
-        
-        if len(recent_data) < 2:
-            return "数据不足，无法进行趋势分析"
-        
-        # 计算趋势
-        price_change = float(recent_data['price'].iloc[-1] - recent_data['price'].iloc[0])
-        price_change_pct = (price_change / float(recent_data['price'].iloc[0])) * 100
-        
-        trend_analysis = {
-            "trend_direction": "上涨" if price_change > 0 else "下跌" if price_change < 0 else "平稳",
-            "price_change": round(price_change, 2),
-            "price_change_percentage": round(price_change_pct, 2),
-            "current_price": round(float(recent_data['price'].iloc[-1]), 2),
-            "average_price": round(float(recent_data['price'].mean()), 2),
-            "volatility": round(float(recent_data['price'].std()), 2) if len(recent_data) > 1 else 0.0
-        }
-        
-        return trend_analysis
-    except Exception as e:
-        return f"趋势分析出错: {str(e)}"
-
-def generate_investment_advice(trend_analysis, city, area=None):
-    """生成投资建议"""
-    if isinstance(trend_analysis, str):
-        return trend_analysis
-    
-    location = f"{city}市{area}区域" if area else f"{city}市"
-    advice = []
-    
-    # 基于趋势的建议
-    if trend_analysis["trend_direction"] == "上涨":
-        if trend_analysis["price_change_percentage"] > 10:
-            advice.append(f"⚠️ {location}房价涨幅较大（{trend_analysis['price_change_percentage']:.1f}%），建议谨慎入市")
-        else:
-            advice.append(f"📈 {location}房价稳步上涨，可考虑适时入手")
-    elif trend_analysis["trend_direction"] == "下跌":
-        if trend_analysis["price_change_percentage"] < -5:
-            advice.append(f"📉 {location}房价下跌明显，可能是购买时机")
-        else:
-            advice.append(f"📊 {location}房价略有下调，建议观望")
-    else:
-        advice.append(f"📏 {location}房价相对稳定，适合长期投资")
-    
-    # 基于波动性的建议
-    if trend_analysis["volatility"] > trend_analysis["average_price"] * 0.1:
-        advice.append("⚡ 价格波动较大，投资需谨慎评估风险")
-    else:
-        advice.append("✅ 价格相对稳定，投资风险较低")
-    
-    return advice
-
-def analyze_market_insights(city):
-    """市场洞察分析"""
-    try:
-        city_data = df[df['city'] == city].copy()
-        if city_data.empty:
-            return "暂无该城市数据"
-        
-        insights = {}
-        
-        # 最新数据分析
-        latest_date = city_data['date'].max()
-        latest_data = city_data[city_data['date'] == latest_date]
-        
-        if not latest_data.empty:
-            insights["最高价区域"] = latest_data.loc[latest_data['price'].idxmax(), 'area']
-            insights["最低价区域"] = latest_data.loc[latest_data['price'].idxmin(), 'area']
-            insights["平均房价"] = round(float(latest_data['price'].mean()), 2)
-            insights["价格区间"] = f"{int(latest_data['price'].min())} - {int(latest_data['price'].max())}"
-        
-        # 时间趋势分析
-        monthly_data = city_data.groupby(city_data['date'].dt.to_period('M'))['price'].mean()
-        if len(monthly_data) >= 2:
-            recent_trend = float(monthly_data.iloc[-1] - monthly_data.iloc[-2])
-            insights["月度变化"] = f"{'上涨' if recent_trend > 0 else '下跌'} {abs(recent_trend):.0f}元/平米"
-        
-        return insights
-    except Exception as e:
-        return f"市场洞察分析出错: {str(e)}"
-
-@app.post("/ai/analyze")
-def ai_analyze(request: AIQueryRequest):
-    """AI助手分析接口"""
-    try:
-        query = request.query.lower()
-        city = request.city
-        area = request.area
-        
-        response = {
-            "query": request.query,
-            "analysis": "",
-            "insights": {},
-            "recommendations": []
-        }
-        
-        # 根据查询类型提供不同的分析
-        if "趋势" in query or "走势" in query:
-            if city and area:
-                trend_data = df[(df['city'] == city) & (df['area'] == area)]
-                trend_analysis = analyze_price_trend(trend_data)
-                response["analysis"] = f"{city}{area}区域的房价趋势分析"
-                response["insights"] = trend_analysis
-                if isinstance(trend_analysis, dict):
-                    response["recommendations"] = generate_investment_advice(trend_analysis, city, area)
-            elif city:
-                city_data = df[df['city'] == city]
-                trend_analysis = analyze_price_trend(city_data)
-                response["analysis"] = f"{city}市整体房价趋势分析"
-                response["insights"] = trend_analysis
-                if isinstance(trend_analysis, dict):
-                    response["recommendations"] = generate_investment_advice(trend_analysis, city)
-            else:
-                response["analysis"] = "请指定要分析的城市或区域"
-                
-        elif "投资" in query or "建议" in query:
-            if city:
-                city_data = df[df['city'] == city]
-                if area:
-                    city_data = city_data[city_data['area'] == area]
-                trend_analysis = analyze_price_trend(city_data)
-                response["analysis"] = f"{city}{'的' + area + '区域' if area else ''}投资建议"
-                response["recommendations"] = generate_investment_advice(trend_analysis, city, area)
-            else:
-                response["analysis"] = "请指定要投资的城市"
-                
-        elif "洞察" in query or "分析" in query or "市场" in query:
-            if city:
-                insights = analyze_market_insights(city)
-                response["analysis"] = f"{city}市场洞察分析"
-                response["insights"] = insights
-            else:
-                response["analysis"] = "请指定要分析的城市"
-                
-        elif "对比" in query or "比较" in query:
-            response["analysis"] = "请使用城市对比功能进行详细比较"
-            response["recommendations"] = ["建议前往'城市对比'页面获取详细的对比分析"]
-            
-        else:
-            # 默认提供市场概览
-            if city:
-                insights = analyze_market_insights(city)
-                response["analysis"] = f"{city}市场概览"
-                response["insights"] = insights
-                # 添加一些通用建议
-                response["recommendations"] = [
-                    "建议关注房价趋势变化",
-                    "可以查看具体区域的详细分析",
-                    "投资前请综合考虑多种因素"
-                ]
-            else:
-                response["analysis"] = "我可以帮您分析房价趋势、提供投资建议、市场洞察等。请告诉我您想了解哪个城市的信息。"
-                response["recommendations"] = [
-                    "请选择具体城市进行分析",
-                    "可以询问：房价趋势、投资建议、市场分析等"
-                ]
-        
-        return response
-        
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"AI分析失败: {str(e)}")
-
-@app.get("/ai/suggestions")
-def get_ai_suggestions(city: str):
-    """获取AI建议的问题"""
-    suggestions = [
-        f"{city}的房价趋势如何？",
-        f"{city}适合投资吗？",
-        f"{city}的市场分析",
-        f"{city}各区域房价对比",
-        f"{city}未来房价预测"
-    ]
-    return {"suggestions": suggestions}
-
-@app.get("/cities")
-def get_cities():
-    """获取所有可用的城市列表"""
-    try:
-        cities = sorted(df['city'].unique().tolist())
-        return {"cities": cities}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"获取城市列表失败: {str(e)}")
 
 
 # ==================== 用户管理API接口 ====================
@@ -949,3 +931,41 @@ def calculate_metrics(df):
 
 # 将路由添加到主应用
 app.include_router(prediction_router, tags=["prediction"])
+
+class AIChatRequest(BaseModel):
+    query: str
+    city: Optional[str] = None
+    area: Optional[str] = None
+    # 可拓展更多上下文字段
+
+@app.post("/ai/assistant")
+def ai_assistant(
+    req: AIChatRequest,
+    current_user: Optional[dict] = Depends(get_optional_user)
+):
+    """
+    AI助手 - 支持通用对话和房价智能分析
+    """
+    # 记录用户身份（可选）
+    user_id = current_user["id"] if current_user else None
+
+    # 如果提供城市/区域，尝试趋势分析，否则为通用对话
+    if req.city:
+        # 数据筛选
+        area_df = df[(df['city'] == req.city)]
+        if req.area:
+            area_df = area_df[area_df['area'] == req.area]
+        if area_df.empty:
+            return {"error": f"未找到{req.city}{req.area or ''}的房价数据"}
+        result = ai_service.analyze_housing_trend(req.city, req.area, area_df)
+        return result
+    else:
+        # 通用AI对话
+        ai_result = ai_service.chat_with_ai(prompt=req.query, system_prompt="你是专业的房地产智能助手，请用中文简明回答用户问题。")
+        return ai_result
+@app.get("/cities")
+def get_cities():
+    """获取所有城市列表"""
+    cities = sorted(df['city'].unique().tolist())
+    return {"cities": cities}
+

@@ -4,6 +4,7 @@ import pandas as pd
 import plotly.express as px
 from streamlit_option_menu import option_menu
 import os
+import pandas as pd
 import json
 from datetime import datetime
 
@@ -154,6 +155,36 @@ def load_css(file_name):
 
 # 调用函数加载CSS
 load_css("style.css")
+
+def render_basic_stats(stats: dict):
+    """将基础统计数据友好地用中文格式化输出"""
+    if not stats:
+        st.info("暂无基础统计信息")
+        return
+
+    # 字段名映射
+    field_map = {
+        "current_price": "当前价格",
+        "average_price": "平均价格",
+        "price_change": "价格变化",
+        "price_change_percentage": "价格变化幅度",
+        "sample_count": "统计月数",
+        "price_range": "价格区间"
+    }
+    # 展示主统计
+    st.markdown("#### 📊 基础统计信息")
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        st.metric(field_map["current_price"], f'{int(stats.get("current_price", 0)):,} 元/㎡')
+        st.metric(field_map["average_price"], f'{int(stats.get("average_price", 0)):,} 元/㎡')
+    with col2:
+        st.metric(field_map["price_change"], f'{stats.get("price_change", 0):,.0f} 元')
+        st.metric(field_map["price_change_percentage"], f'{stats.get("price_change_percentage", 0):.2f} %')
+    with col3:
+        st.metric(field_map["sample_count"], f'{stats.get("sample_count", 0)} 个月')
+        pr = stats.get("price_range", {})
+        st.metric(field_map["price_range"], f'{int(pr.get("min",0)):,} ~ {int(pr.get("max",0)):,} 元/㎡')
+
 
 # 添加页面刷新按钮到侧边栏（用于开发调试）
 with st.sidebar:
@@ -797,167 +828,87 @@ if page == "数据洞察":
 
 # --- AI助手页面 ---
 if page == "AI助手":
-    st.header("🤖 AI房价分析助手")
-    st.markdown("我是您的智能房价分析助手，可以帮您分析市场趋势、提供投资建议。")
-    
-    # 城市选择
-    cities = load_all_cities()
-    col1, col2 = st.columns([1, 1])
-    
-    with col1:
-        selected_city = st.selectbox("选择城市 (可选)", [""] + cities, index=0)
-    
-    with col2:
-        if selected_city:
-            areas = load_areas_for_city(selected_city)
-            selected_area = st.selectbox("选择区域 (可选)", [""] + areas, index=0)
-        else:
-            selected_area = ""
-    
-    # 获取建议问题
-    if selected_city:
-        try:
-            suggestions_response = requests.get(f"{BACKEND_URL}/ai/suggestions", params={"city": selected_city})
-            if suggestions_response.status_code == 200:
-                suggestions = suggestions_response.json().get("suggestions", [])
-                
-                st.subheader("💡 建议问题")
-                col1, col2, col3 = st.columns(3)
-                
-                for i, suggestion in enumerate(suggestions[:6]):  # 最多显示6个建议
-                    col = [col1, col2, col3][i % 3]
-                    with col:
-                        if st.button(suggestion, key=f"suggestion_{i}"):
-                            st.session_state.ai_query = suggestion
-        except:
-            pass
-    
-    # 用户输入
-    st.subheader("💬 向AI提问")
-    
-    # 使用session state保存查询
-    if "ai_query" not in st.session_state:
-        st.session_state.ai_query = ""
-    
-    # 文本输入框
-    user_query = st.text_input(
-        "请输入您的问题", 
-        value=st.session_state.ai_query,
-        placeholder="例如：北京的房价趋势如何？深圳适合投资吗？",
-        key="query_input"
-    )
-    
-    # 清空session state中的查询
-    if user_query != st.session_state.ai_query:
-        st.session_state.ai_query = ""
-    
-    # 分析按钮
-    col1, col2, col3 = st.columns([1, 1, 2])
-    with col1:
-        analyze_button = st.button("🔍 开始分析", type="primary")
-    
-    with col2:
-        clear_button = st.button("🗑️ 清空")
-        if clear_button:
-            st.session_state.ai_query = ""
-            st.rerun()
-    
-    # AI分析
-    if analyze_button and user_query.strip():
-        with st.spinner("AI正在分析中..."):
-            try:
-                # 准备请求数据
-                request_data = {
-                    "query": user_query,
-                    "city": selected_city if selected_city else None,
-                    "area": selected_area if selected_area else None
+    st.header("🤖 AI助手 - 智能房价分析与对话")
+
+    # 聊天历史（可选，session_state存储）
+    if "ai_chat_history" not in st.session_state:
+        st.session_state.ai_chat_history = []
+
+    # 选项：智能分析 or 通用对话
+    mode = st.radio("请选择AI助手模式", ["房价智能分析", "自由对话"], horizontal=True)
+
+    if mode == "房价智能分析":
+        # 选择城市/区域
+        cities = load_all_cities()
+        city = st.selectbox("请选择城市", cities, key="ai_city")
+        areas = load_areas_for_city(city) if city else []
+        area = st.selectbox("请选择区域（可选）", [""] + areas, key="ai_area")
+        if st.button("让AI分析房价趋势", use_container_width=True):
+            with st.spinner("AI正在分析..."):
+                payload = {
+                    "query": "请分析该地区的房价趋势",
+                    "city": city,
+                    "area": area if area else None
                 }
-                
-                # 发送请求
-                response = requests.post(f"{BACKEND_URL}/ai/analyze", json=request_data)
-                
-                if response.status_code == 200:
-                    ai_result = response.json()
-                    
-                    # 显示分析结果
-                    st.success("✅ 分析完成")
-                    
-                    # 分析标题
-                    st.subheader(f"📊 {ai_result.get('analysis', '分析结果')}")
-                    
-                    # 显示洞察
-                    insights = ai_result.get('insights', {})
-                    if insights and isinstance(insights, dict):
-                        st.subheader("📈 数据洞察")
-                        
-                        if 'trend_direction' in insights:
-                            # 趋势分析结果
-                            col1, col2, col3 = st.columns(3)
-                            
-                            with col1:
-                                trend_emoji = "📈" if insights['trend_direction'] == "上涨" else "📉" if insights['trend_direction'] == "下跌" else "📊"
-                                st.metric("趋势方向", f"{trend_emoji} {insights['trend_direction']}")
-                                
-                            with col2:
-                                st.metric("价格变化", f"{insights.get('price_change', 0):.2f} 元/平米")
-                                
-                            with col3:
-                                change_pct = insights.get('price_change_percentage', 0)
-                                st.metric("变化幅度", f"{change_pct:+.2f}%")
-                            
-                            col1, col2, col3 = st.columns(3)
-                            with col1:
-                                st.metric("当前价格", f"{insights.get('current_price', 0):,.2f} 元/平米")
-                            with col2:
-                                st.metric("平均价格", f"{insights.get('average_price', 0):,.2f} 元/平米")
-                            with col3:
-                                st.metric("价格波动", f"{insights.get('volatility', 0):,.2f}")
-                        
+                try:
+                    res = requests.post(f"{BACKEND_URL}/ai/assistant", json=payload, headers=get_auth_headers())
+                    result = res.json()
+                    if "error" in result:
+                        st.error(result["error"])
+                    else:
+                        # 展示AI回复
+                        st.markdown("##### AI分析结果：")
+                        if "error" in result:
+                            st.error(result["error"])
+                        elif "text" in result:
+                            st.markdown(result["text"])
                         else:
-                            # 市场洞察结果
-                            col1, col2 = st.columns(2)
-                            
-                            with col1:
-                                for key, value in list(insights.items())[:3]:
-                                    st.metric(key, str(value))
-                            
-                            with col2:
-                                for key, value in list(insights.items())[3:]:
-                                    st.metric(key, str(value))
-                    
-                    # 显示建议
-                    recommendations = ai_result.get('recommendations', [])
-                    if recommendations:
-                        st.subheader("💡 AI建议")
-                        for i, rec in enumerate(recommendations):
-                            st.info(f"{i+1}. {rec}")
-                
-                else:
-                    st.error(f"分析失败: {response.text}")
-                    
-            except requests.exceptions.RequestException as e:
-                st.error(f"无法连接到AI服务: {e}")
-            except Exception as e:
-                st.error(f"分析过程中发生错误: {e}")
-    
-    elif analyze_button:
-        st.warning("请输入您的问题")
-    
-    # 使用说明
-    with st.expander("📚 使用说明"):
-        st.markdown("""
-        **AI助手可以帮您：**
-        - 🔍 **趋势分析**: 分析房价走势和变化趋势
-        - 💰 **投资建议**: 基于数据提供投资参考意见  
-        - 📊 **市场洞察**: 深入分析市场数据和特征
-        - 🏙️ **城市对比**: 提供不同城市的对比分析建议
-        
-        **使用技巧：**
-        - 选择具体城市获得更精准的分析
-        - 可以询问具体区域的详细信息
-        - 支持自然语言提问，如"北京房价如何？"
-        - 点击建议问题快速开始分析
-        """)
+                            st.warning("AI未返回有效内容")
+                        # 展示基础统计（可选）
+                        if "basic_stats" in result:
+                            render_basic_stats(result["basic_stats"])
+                        # 聊天历史
+                        st.session_state.ai_chat_history.append({
+                            "role": "user", "content": f"[{city} {area}] 房价趋势分析"
+                        })
+                        st.session_state.ai_chat_history.append({
+                            "role": "ai", "content": result["text"]
+                        })
+                except Exception as e:
+                    st.error(f"AI分析失败: {str(e)}")
+    else:
+        # 自由对话
+        user_input = st.text_area("输入你的问题（如：介绍北京房价走势、未来房价趋势等）", key="ai_input")
+        if st.button("发送", use_container_width=True):
+            if user_input.strip():
+                with st.spinner("AI正在思考..."):
+                    payload = {"query": user_input}
+                    try:
+                        res = requests.post(f"{BACKEND_URL}/ai/assistant", json=payload, headers=get_auth_headers())
+                        result = res.json()
+                        if "error" in result:
+                            st.error(result["error"])
+                        else:
+                            st.markdown("##### AI回复：")
+                            st.markdown(result["text"])
+                            # 聊天历史
+                            st.session_state.ai_chat_history.append({"role": "user", "content": user_input})
+                            st.session_state.ai_chat_history.append({"role": "ai", "content": result["text"]})
+                    except Exception as e:
+                        st.error(f"AI对话失败: {str(e)}")
+            else:
+                st.warning("请输入你的问题")
+
+    # 展示聊天历史
+    if st.session_state.ai_chat_history:
+        st.markdown("---")
+        st.markdown("#### 聊天记录")
+        for msg in st.session_state.ai_chat_history[-10:]:
+            role = "👤" if msg["role"] == "user" else "🤖"
+            st.markdown(f"{role} {msg['content']}", unsafe_allow_html=True)
+        if st.button("清空聊天记录"):
+            st.session_state.ai_chat_history = []
+
 
 # --- 登录页面 ---
 elif page == "登录":
